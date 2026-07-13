@@ -40,15 +40,15 @@ bot.catch((error) => {
 const adminReplyMap = new Map<number, { userId: number; ticketId: string; userName: string }>();
 
 const customerStartTemplate = (name: string, ticketId: string): string => [
-  '🎮 Selamat datang di **TopUpGames**!',
+  '🎮 Selamat datang di **TopUpin**!',
   '',
-  'Saya adalah asisten virtual CS TopUpGames. Saya siap membantu Anda terhubung dengan tim Customer Service kami.',
+  'Saya adalah asisten virtual CS TopUpin. Saya siap membantu Anda terhubung dengan tim Customer Service kami.',
   '',
   '📋 **Menu Layanan:**',
   '├── 💬 **Hubungi CS** - Konsultasi dengan tim kami',
   '├── 📦 **Cek Status** - Lacak transaksi Anda',
   '├── ❓ **FAQ** - Pertanyaan yang sering diajukan',
-  '└── 🔙 **Website** - Kembali ke TopUpGames.com',
+  '└── 🔙 **Website** - Kembali ke TopUpin.com',
   '',
   '🕐 **Jam Operasional CS:**',
   'Senin - Minggu | 09:00 - 22:00 WIB',
@@ -67,8 +67,8 @@ const csOfflineTemplate = (): string => [
   '',
   'Namun, Anda tetap dapat:',
   '1. 📩 **Kirim pesan sekarang** - Akan kami balas besok pagi',
-  '2. 📖 **Baca FAQ** - Kunjungi topupgames.com/faq',
-  '3. 🔍 **Cek Status** - topupgames.com/status',
+  '2. 📖 **Baca FAQ** - Kunjungi TopUpin.com/faq',
+  '3. 🔍 **Cek Status** - TopUpin.com/status',
   '',
   'Terima kasih atas pengertiannya! 🙏',
 ].join('\n');
@@ -108,7 +108,7 @@ const customerReplyTemplate = (name: string, replyText: string, ticketId: string
   `📌 **Tiket:** #${ticketId}`,
   '💬 *Balas pesan ini untuk melanjutkan percakapan.*',
   '',
-  'Terima kasih telah menggunakan TopUpGames! 😊',
+  'Terima kasih telah menggunakan TopUpin! 😊',
 ].join('\n');
 
 const transactionStatusTemplate = (): string => [
@@ -150,7 +150,7 @@ const faqTemplate = (): string => [
   '',
   '━━━━━━━━━━━━━━━━━━━━━',
   '📌 **1. Bagaimana cara top up?**',
-  'Kunjungi website TopUpGames.com, pilih game, masukkan ID, pilih nominal, lalu bayar.',
+  'Kunjungi website TopUpin.com, pilih game, masukkan ID, pilih nominal, lalu bayar.',
   '',
   '📌 **2. Top up belum masuk, bagaimana?**',
   'Cek status transaksi di website atau hubungi CS dengan menyertakan Transaction ID.',
@@ -165,7 +165,7 @@ const faqTemplate = (): string => [
   'Proses otomatis < 30 detik setelah pembayaran berhasil.',
   '',
   '━━━━━━━━━━━━━━━━━━━━━',
-  '🔗 **Info lengkap:** topupgames.com/faq',
+  '🔗 **Info lengkap:** TopUpin.com/faq',
   '💬 **Butuh bantuan lain?** Chat langsung dengan CS di sini.',
 ].join('\n');
 
@@ -250,7 +250,7 @@ bot.command('start', async (ctx) => {
     const maxTickets = csAgent?.maxTickets ?? 5;
 
     const csWelcome = [
-      '🎖️ **MODE CS - TopUpGames**',
+      '🎖️ **MODE CS - TopUpin**',
       '',
       '━━━━━━━━━━━━━━━━━━━━━',
       `Selamat datang, **${csName}**! 👋`,
@@ -279,7 +279,7 @@ bot.command('start', async (ctx) => {
     setUserSession(telegramId, 'admin');
     const adminName = ctx.from?.first_name || 'Admin';
     const adminWelcome = [
-      '🛡️ **MODE ADMIN - TopUpGames**',
+      '🛡️ **MODE ADMIN - TopUpin**',
       '',
       '━━━━━━━━━━━━━━━━━━━━━',
       `Selamat datang, **${adminName}**! 👋`,
@@ -334,7 +334,7 @@ bot.command('menu', async (ctx) => {
     const maxTickets = csAgent?.maxTickets ?? 5;
 
     const csWelcome = [
-      '🎖️ **MODE CS - TopUpGames**',
+      '🎖️ **MODE CS - TopUpin**',
       '',
       '━━━━━━━━━━━━━━━━━━━━━',
       `Selamat datang, **${csName}**! 👋`,
@@ -362,7 +362,7 @@ bot.command('menu', async (ctx) => {
   if (role === 'admin') {
     const adminName = ctx.from?.first_name || 'Admin';
     const adminWelcome = [
-      '🛡️ **MODE ADMIN - TopUpGames**',
+      '🛡️ **MODE ADMIN - TopUpin**',
       '',
       '━━━━━━━━━━━━━━━━━━━━━',
       `Selamat datang, **${adminName}**! 👋`,
@@ -447,7 +447,7 @@ bot.command('cs', async (ctx) => {
   const maxTickets = csAgent?.maxTickets ?? 5;
 
   const csWelcome = [
-    '🎖️ **MODE CS - TopUpGames**',
+    '🎖️ **MODE CS - TopUpin**',
     '',
     '━━━━━━━━━━━━━━━━━━━━━',
     `Selamat datang, **${csName}**! 👋`,
@@ -474,7 +474,7 @@ bot.command('admin', async (ctx) => {
 
   const adminName = ctx.from?.first_name || 'Admin';
   const adminWelcome = [
-    '🛡️ **MODE ADMIN - TopUpGames**',
+    '🛡️ **MODE ADMIN - TopUpin**',
     '',
     '━━━━━━━━━━━━━━━━━━━━━',
     `Selamat datang, **${adminName}**! 👋`,
@@ -627,7 +627,7 @@ bot.on('callback_query:data', async (ctx) => {
   }
 
   if (data === 'customer_website') {
-    await ctx.reply('Kunjungi website: topupgames.com');
+    await ctx.reply('Kunjungi website: TopUpin.com');
     await ctx.answerCallbackQuery('Website ditampilkan');
     return;
   }
@@ -733,7 +733,7 @@ bot.on('callback_query:data', async (ctx) => {
     const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     const dashboardText = [
-      '📊 **DASHBOARD ADMIN - TopUpGames**',
+      '📊 **DASHBOARD ADMIN - TopUpin**',
       '',
       '━━━━━━━━━━━━━━━━━━━━━',
       `📅 **Hari Ini:** ${dateStr}`,
@@ -955,7 +955,7 @@ bot.on('callback_query:data', async (ctx) => {
           `💰 *Nominal*: Rp ${Number(trx.amount).toLocaleString('id-ID')}`,
           `🚦 *Status*: SUKSES`,
           '',
-          'Terima kasih sudah berbelanja di TopUpGames! 🙏',
+          'Terima kasih sudah berbelanja di TopUpin! 🙏',
         ].join('\n');
       } else {
         messageText = [

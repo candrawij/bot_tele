@@ -349,7 +349,7 @@ export function startWebsiteApi(port = defaultPort): http.Server {
               `💰 *Nominal*: Rp ${Number(trx.amount).toLocaleString('id-ID')}`,
               `🚦 *Status*: SUKSES`,
               '',
-              'Terima kasih sudah berbelanja di TopUpGames! 🙏',
+              'Terima kasih sudah berbelanja di TopUpin! 🙏',
             ].join('\n');
           } else if (status === 'failed') {
             messageText = [

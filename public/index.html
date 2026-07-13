@@ -422,7 +422,7 @@
     </footer>
 
     <script>
-      const API_URL = 'http://localhost:3001';
+      const API_URL = `${window.location.protocol}//${window.location.hostname}:3001`;
 
       // 1. Handle product selection
       const productItems = document.querySelectorAll('.product-item');

@@ -1363,7 +1363,7 @@ bot.on('message:text', async (ctx) => {
     const ticket = await getOrCreateCustomerTicket(telegramId, ctx.from?.first_name ?? 'Customer', text);
     await appendMessage(ticket.ticketId, 'customer', text);
 
-    if (ticket.status === 'assigned' && ticket.csAgentId) {
+    if (ticket.csAgentId) {
       const csAgent = await prisma.csAgent.findUnique({ where: { id: ticket.csAgentId } });
       if (csAgent && csAgent.telegramId) {
         const csTelegramId = Number(csAgent.telegramId);

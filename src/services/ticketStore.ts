@@ -14,12 +14,23 @@ export type TicketRecord = Ticket & {
 interface UserSession {
   role: UserRole;
   ticketId?: string;
+  orderState?: 'idle' | 'awaiting_game_id';
+  orderData?: {
+    gameId?: number;
+    gameSlug?: string;
+    userGameId?: string;
+  };
 }
 
 const sessions = new Map<number, UserSession>();
 
-export function setUserSession(telegramId: number, role: UserRole, ticketId?: string): void {
-  sessions.set(telegramId, { role, ticketId });
+export function setUserSession(telegramId: number, role: UserRole, ticketId?: string, orderState?: 'idle' | 'awaiting_game_id', orderData?: any): void {
+  sessions.set(telegramId, { role, ticketId, orderState, orderData });
+}
+
+export function updateUserSession(telegramId: number, partialSession: Partial<UserSession>): void {
+  const current = sessions.get(telegramId) || { role: 'customer' };
+  sessions.set(telegramId, { ...current, ...partialSession });
 }
 
 export function getUserSession(telegramId: number): UserSession | undefined {
@@ -220,4 +231,29 @@ export async function listCsTickets(telegramId: number): Promise<TicketRecord[]>
     include: { messages: true }
   });
   return tickets as unknown as TicketRecord[];
+}
+
+export async function rateTicket(ticketId: string, rating: number): Promise<void> {
+  const ticket = await prisma.ticket.update({
+    where: { ticketId },
+    data: { rating }
+  });
+
+  if (ticket.csAgentId) {
+    // Calculate new average rating for the CS agent
+    const result = await prisma.ticket.aggregate({
+      where: {
+        csAgentId: ticket.csAgentId,
+        rating: { not: null }
+      },
+      _avg: { rating: true }
+    });
+
+    const avgRating = result._avg.rating || 0;
+    
+    await prisma.csAgent.update({
+      where: { id: ticket.csAgentId },
+      data: { rating: avgRating }
+    });
+  }
 }

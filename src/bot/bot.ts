@@ -10,9 +10,11 @@ import {
   listAdminTickets,
   listOpenTickets, listCsTickets,
   setUserSession,
+  updateUserSession,
   ticketListText,
   ticketSummary,
   updateTicketStatus,
+  rateTicket,
 } from '../services/ticketStore.js';
 import { parsePayload } from '../services/telegramPayload.js';
 import { getTransactionByTrxId } from '../services/transactionStore.js';
@@ -130,6 +132,7 @@ function buildMainMenu(role: string): InlineKeyboard {
   const keyboard = new InlineKeyboard();
 
   if (role === 'customer') {
+    keyboard.text('🛒 Order Top Up', 'customer_order').row();
     keyboard.text('📦 Cek Status', 'customer_status').row();
     keyboard.text('💬 Hubungi CS', 'customer_help').row();
     keyboard.text('❓ FAQ', 'customer_faq').row();
@@ -290,6 +293,117 @@ bot.on('callback_query:data', async (ctx) => {
     return;
   }
 
+  if (data === 'customer_order') {
+    const games = await prisma.game.findMany({ where: { isActive: true } });
+    if (games.length === 0) {
+      await ctx.reply('Maaf, saat ini belum ada game yang tersedia.');
+      await ctx.answerCallbackQuery();
+      return;
+    }
+
+    const keyboard = new InlineKeyboard();
+    games.forEach((g) => keyboard.text(g.name, `select_game:${g.slug}`).row());
+
+    await ctx.reply('🎮 Silakan pilih Game yang ingin di-Top Up:', {
+      reply_markup: keyboard,
+    });
+    await ctx.answerCallbackQuery();
+    return;
+  }
+
+  if (data.startsWith('select_game:')) {
+    const gameSlug = data.replace('select_game:', '');
+    const game = await prisma.game.findUnique({ where: { slug: gameSlug } });
+    
+    if (!game) {
+      await ctx.answerCallbackQuery('Game tidak ditemukan.');
+      return;
+    }
+
+    updateUserSession(telegramId, {
+      orderState: 'awaiting_game_id',
+      orderData: { gameId: game.id, gameSlug: game.slug }
+    });
+
+    await ctx.reply(`🎮 Anda memilih *${game.name}*.\n\nSilakan ketikkan **User ID Game** Anda (misalnya: 12345678):`, { parse_mode: 'Markdown' });
+    await ctx.answerCallbackQuery();
+    return;
+  }
+
+  if (data.startsWith('select_product:')) {
+    const productId = Number(data.replace('select_product:', ''));
+    const session = getUserSession(telegramId);
+    
+    if (!session || !session.orderData || !session.orderData.gameId) {
+      await ctx.answerCallbackQuery('Sesi pemesanan Anda tidak valid, silakan ulangi pesanan dari awal.');
+      return;
+    }
+
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: { game: true }
+    });
+
+    if (!product) {
+      await ctx.answerCallbackQuery('Produk tidak ditemukan.');
+      return;
+    }
+
+    const firstUser = await prisma.user.findFirst();
+    const userGameId = session.orderData.userGameId || 'UNKNOWN';
+
+    const randomTrxId = `TRX-${Math.floor(100 + Math.random() * 900)}`;
+    const transaction = await prisma.transaction.create({
+      data: {
+        trxId: randomTrxId,
+        gameId: product.gameId,
+        productId: product.id,
+        userId: firstUser ? firstUser.id : null,
+        userGameId: userGameId,
+        amount: product.price,
+        paymentMethod: 'Qris',
+        status: 'pending',
+      },
+    });
+
+    updateUserSession(telegramId, { orderState: 'idle', orderData: undefined });
+
+    if (config.adminGroupChatId) {
+      const adminText = [
+        '💸 *PESANAN TRANSAKSI BARU (VIA TELEGRAM)*',
+        '',
+        `🆔 ID: ${randomTrxId}`,
+        `🎮 Game: ${product.game.name}`,
+        `📦 Produk: ${product.name}`,
+        `👤 ID Game User: ${userGameId}`,
+        `💰 Nominal: Rp ${Number(product.price).toLocaleString('id-ID')}`,
+        `🚦 Status: PENDING`,
+        '',
+        'Silakan proses pesanan ini:'
+      ].join('\n');
+
+      const keyboard = new InlineKeyboard()
+        .text('✅ Proses (Sukses)', `admin_trx_success:${randomTrxId}`)
+        .text('❌ Tolak (Gagal)', `admin_trx_failed:${randomTrxId}`);
+
+      try {
+        await bot.api.sendMessage(config.adminGroupChatId, adminText, {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard,
+        });
+      } catch (e) {
+        console.error('Failed to send admin transaction notification:', e);
+      }
+    }
+
+    await ctx.reply(
+      `✅ Pesanan berhasil dibuat!\n\n🆔 ID Transaksi: *${randomTrxId}*\n📦 Produk: *${product.name}*\n\nAdmin kami sedang memproses pesanan Anda. Silakan tunggu!`,
+      { parse_mode: 'Markdown' }
+    );
+    await ctx.answerCallbackQuery();
+    return;
+  }
+
   if (data === 'customer_help') {
     await ctx.reply(buildCustomerPromptTemplate());
     await ctx.answerCallbackQuery('Template chat customer ditampilkan');
@@ -359,10 +473,61 @@ bot.on('callback_query:data', async (ctx) => {
   }
 
   if (data === 'admin_dashboard') {
-    const tickets = (await listAdminTickets()).slice(0, 3);
-    await ctx.reply(
-      ['Dashboard Admin', 'Tiket terbaru:', ticketListText(tickets)].join('\n'),
-    );
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const successfulTrx = await prisma.transaction.findMany({
+      where: {
+        status: 'success',
+        updatedAt: { gte: today }
+      }
+    });
+
+    const totalTrxCount = successfulTrx.length;
+    const totalRevenue = successfulTrx.reduce((sum, t) => sum + Number(t.amount), 0);
+
+    const openTicketsCount = await prisma.ticket.count({
+      where: { status: { in: ['open', 'assigned', 'pending'] } }
+    });
+
+    const csAgents = await prisma.csAgent.findMany({
+      where: { rating: { gt: 0 } }
+    });
+    let avgCsRating = 0;
+    if (csAgents.length > 0) {
+      avgCsRating = csAgents.reduce((sum, cs) => sum + Number(cs.rating), 0) / csAgents.length;
+    }
+
+    const dashboardText = [
+      '📊 *DASHBOARD STATISTIK HARI INI*',
+      '',
+      `📈 *Transaksi Sukses*: ${totalTrxCount} order`,
+      `💰 *Pendapatan*: Rp ${totalRevenue.toLocaleString('id-ID')}`,
+      '',
+      `🎫 *Tiket Aktif*: ${openTicketsCount} tiket`,
+      `⭐ *Rata-rata Performa CS*: ${avgCsRating.toFixed(2)} Bintang`,
+      '',
+      '_Data diperbarui secara real-time_'
+    ].join('\n');
+
+    const keyboard = new InlineKeyboard().text('🔄 Refresh Data', 'admin_dashboard');
+
+    if (ctx.callbackQuery.message) {
+      try {
+        await ctx.editMessageText(dashboardText, {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard,
+        });
+      } catch (e) {
+        // Ignored if message is not modified
+      }
+    } else {
+      await ctx.reply(dashboardText, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard,
+      });
+    }
+
     await ctx.answerCallbackQuery('Dashboard admin ditampilkan');
     return;
   }
@@ -445,8 +610,15 @@ bot.on('callback_query:data', async (ctx) => {
     if (ticket.userId) {
       const user = await prisma.user.findUnique({ where: { id: ticket.userId } });
       if (user && user.telegramId) {
-        const customerText = `Pesan dari CS: Tiket bantuan Anda #${ticket.ticketId} telah diselesaikan. Terima kasih telah menghubungi kami! 🙏`;
-        await bot.api.sendMessage(Number(user.telegramId), customerText);
+        const customerText = `✅ Pesan dari CS: Tiket bantuan Anda #${ticket.ticketId} telah diselesaikan.\n\nSeberapa puas Anda dengan pelayanan kami?`;
+        const ratingKeyboard = new InlineKeyboard()
+          .text('⭐ 1', `rate_cs:${ticket.ticketId}:1`)
+          .text('⭐ 2', `rate_cs:${ticket.ticketId}:2`)
+          .text('⭐ 3', `rate_cs:${ticket.ticketId}:3`)
+          .text('⭐ 4', `rate_cs:${ticket.ticketId}:4`)
+          .text('⭐ 5', `rate_cs:${ticket.ticketId}:5`);
+
+        await bot.api.sendMessage(Number(user.telegramId), customerText, { reply_markup: ratingKeyboard });
       }
     }
 
@@ -464,6 +636,30 @@ bot.on('callback_query:data', async (ctx) => {
 
     await ctx.answerCallbackQuery('Tiket berhasil ditutup.');
     return;
+  }
+
+  if (data.startsWith('rate_cs:')) {
+    const parts = data.split(':');
+    if (parts.length === 3) {
+      const ticketId = parts[1];
+      const rating = Number(parts[2]);
+
+      await rateTicket(ticketId, rating);
+      
+      const originalText = ctx.callbackQuery.message?.text ?? '✅ Pesan dari CS: Tiket bantuan Anda telah diselesaikan.';
+      const updatedText = `${originalText}\n\n🙏 Terima kasih! Anda memberikan penilaian ${rating} Bintang.`;
+
+      try {
+        await ctx.editMessageText(updatedText, {
+          reply_markup: undefined,
+        });
+      } catch (e) {
+        console.error('Failed to edit rating message:', e);
+      }
+      
+      await ctx.answerCallbackQuery('Terima kasih atas penilaian Anda!');
+      return;
+    }
   }
 
   if (data.startsWith('admin_trx_success:') || data.startsWith('admin_trx_failed:')) {
@@ -594,6 +790,37 @@ bot.on('message:text', async (ctx) => {
   }
 
   if (role === 'customer') {
+    if (session && session.orderState === 'awaiting_game_id' && session.orderData && session.orderData.gameId) {
+      const userGameId = text;
+      const gameId = session.orderData.gameId;
+      
+      updateUserSession(telegramId, {
+        orderData: { ...session.orderData, userGameId }
+      });
+
+      const products = await prisma.product.findMany({
+        where: { gameId, isActive: true },
+        orderBy: { price: 'asc' }
+      });
+
+      if (products.length === 0) {
+        updateUserSession(telegramId, { orderState: 'idle' });
+        await ctx.reply('Maaf, belum ada produk untuk game ini.');
+        return;
+      }
+
+      const keyboard = new InlineKeyboard();
+      products.forEach((p) => {
+        keyboard.text(`${p.name} - Rp ${p.price.toLocaleString('id-ID')}`, `select_product:${p.id}`).row();
+      });
+
+      await ctx.reply(`ID Game Anda: *${userGameId}*\n\nSilakan pilih Produk/Nominal:`, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard,
+      });
+      return;
+    }
+
     if (/^trx/i.test(text)) {
       const transaction = await getTransactionByTrxId(text);
       if (transaction) {

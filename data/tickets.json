@@ -1,0 +1,103 @@
+[
+  {
+    "id": "TCK-0001",
+    "customerId": 7343388290,
+    "customerName": "Candra",
+    "status": "pending",
+    "priority": "normal",
+    "createdAt": "2026-07-12T20:20:44.951Z",
+    "updatedAt": "2026-07-13T01:34:20.089Z",
+    "lastMessage": "\"Harga [produk] Rp [harga] Kak. Mau order?",
+    "conversation": [
+      {
+        "sender": "customer",
+        "text": "Customer membuka chat dari Telegram.",
+        "createdAt": "2026-07-12T20:20:44.951Z"
+      },
+      {
+        "sender": "customer",
+        "text": "TRX250712ABC",
+        "createdAt": "2026-07-13T01:21:46.970Z"
+      },
+      {
+        "sender": "customer",
+        "text": "halo cs, mau topup dioamond",
+        "createdAt": "2026-07-13T01:32:50.304Z"
+      },
+      {
+        "sender": "cs",
+        "text": "\"Harga [produk] Rp [harga] Kak. Mau order?",
+        "createdAt": "2026-07-13T01:34:20.088Z"
+      }
+    ]
+  },
+  {
+    "id": "TCK-0002",
+    "customerId": 11111,
+    "customerName": "Joni",
+    "status": "pending",
+    "priority": "normal",
+    "createdAt": "2026-07-13T01:29:09.123Z",
+    "updatedAt": "2026-07-13T01:29:34.589Z",
+    "lastMessage": "Halo Kak Joni, baik kami cek terlebih dahulu di sistem. Mohon tunggu 5 menit ya.",
+    "conversation": [
+      {
+        "sender": "customer",
+        "text": "/start website-customer-user-12345-ticket-0001-open_ticket",
+        "createdAt": "2026-07-13T01:29:09.123Z"
+      },
+      {
+        "sender": "customer",
+        "text": "/start website-customer-user-12345-ticket-0001-open_ticket",
+        "createdAt": "2026-07-13T01:29:09.124Z"
+      },
+      {
+        "sender": "customer",
+        "text": "Halo CS, saya top up Diamond MLBB senilai 50rb tadi jam 08.00 tapi belum masuk. ID Game: 987654321.",
+        "createdAt": "2026-07-13T01:29:09.126Z"
+      },
+      {
+        "sender": "customer",
+        "text": "/start website-customer-user-12345-ticket-0001-open_ticket",
+        "createdAt": "2026-07-13T01:29:34.584Z"
+      },
+      {
+        "sender": "customer",
+        "text": "Halo CS, saya top up Diamond MLBB senilai 50rb tadi jam 08.00 tapi belum masuk. ID Game: 987654321.",
+        "createdAt": "2026-07-13T01:29:34.587Z"
+      },
+      {
+        "sender": "cs",
+        "text": "Halo Kak Joni, baik kami cek terlebih dahulu di sistem. Mohon tunggu 5 menit ya.",
+        "createdAt": "2026-07-13T01:29:34.589Z"
+      }
+    ]
+  },
+  {
+    "id": "TCK-0003",
+    "customerId": 22222,
+    "customerName": "Siti CS",
+    "status": "open",
+    "priority": "normal",
+    "createdAt": "2026-07-13T01:29:09.127Z",
+    "updatedAt": "2026-07-13T01:29:34.590Z",
+    "lastMessage": "/cs",
+    "conversation": [
+      {
+        "sender": "customer",
+        "text": "/cs",
+        "createdAt": "2026-07-13T01:29:09.127Z"
+      },
+      {
+        "sender": "customer",
+        "text": "/cs",
+        "createdAt": "2026-07-13T01:29:09.127Z"
+      },
+      {
+        "sender": "customer",
+        "text": "/cs",
+        "createdAt": "2026-07-13T01:29:34.590Z"
+      }
+    ]
+  }
+]

@@ -1,4 +1,4 @@
-import { Bot, InlineKeyboard } from 'grammy';
+import { Bot, InlineKeyboard, InputFile } from 'grammy';
 import { config } from '../config.js';
 import {
   appendMessage,
@@ -149,6 +149,7 @@ function buildMainMenu(role: string): InlineKeyboard {
     keyboard.text('🧾 Semua tiket', 'admin_all_tickets').row();
     keyboard.text('⚠️ Ticket urgent', 'admin_urgent').row();
     keyboard.text('📊 Dashboard', 'admin_dashboard').row();
+    keyboard.text('📥 Ekspor CSV', 'admin_export_csv').row();
   }
 
   return keyboard;
@@ -742,6 +743,55 @@ bot.on('callback_query:data', async (ctx) => {
     }
 
     await ctx.answerCallbackQuery(`Transaksi berhasil diproses (${newStatus}).`);
+    return;
+  }
+
+  if (data === 'admin_export_csv') {
+    const transactions = await prisma.transaction.findMany({
+      include: {
+        game: true,
+        product: true,
+        user: true,
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (transactions.length === 0) {
+      await ctx.reply('Belum ada transaksi di database untuk diekspor.');
+      await ctx.answerCallbackQuery('Gagal: Database kosong.');
+      return;
+    }
+
+    const headers = ['Trx ID', 'Tanggal', 'Game', 'Produk', 'Game ID User', 'Nominal', 'Metode Bayar', 'Status'];
+    const rows = transactions.map((t) => [
+      t.trxId,
+      t.createdAt ? new Date(t.createdAt).toISOString() : '',
+      t.game.name,
+      t.product.name,
+      t.userGameId,
+      t.amount,
+      t.paymentMethod,
+      t.status
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const buffer = Buffer.from(csvContent, 'utf-8');
+    const filename = `laporan_transaksi_${new Date().toISOString().slice(0, 10)}.csv`;
+
+    try {
+      await ctx.replyWithDocument(new InputFile(buffer, filename), {
+        caption: '📊 Berikut adalah laporan ekspor seluruh data transaksi dari database MySQL.'
+      });
+    } catch (e) {
+      console.error('Failed to send CSV document:', e);
+      await ctx.reply('Gagal mengekspor file CSV. Silakan periksa log server.');
+    }
+
+    await ctx.answerCallbackQuery('File CSV berhasil dikirim.');
     return;
   }
 

@@ -118,18 +118,26 @@ export function startWebsiteApi(port = defaultPort): http.Server {
         const role = requestUrl.searchParams.get('role') ?? 'customer';
         const userId = Number(requestUrl.searchParams.get('userId') ?? 0);
         const ticketId = requestUrl.searchParams.get('ticketId') ?? undefined;
-        const resolved = resolveWebsiteUser({
-          role,
-          userId,
-          ticketId,
-        });
-        const link = getRoleLink(resolved.role ?? role, resolved.userId || userId || undefined, resolved.ticketId ?? ticketId);
+        const trxId = requestUrl.searchParams.get('trxId') ?? undefined;
+
+        let link = '';
+        if (role === 'customer' && trxId) {
+          link = `https://t.me/${config.botUsername}?start=trx_${trxId}`;
+        } else {
+          const resolved = resolveWebsiteUser({
+            role,
+            userId,
+            ticketId,
+          });
+          link = getRoleLink(resolved.role ?? role, resolved.userId || userId || undefined, resolved.ticketId ?? ticketId);
+        }
 
         jsonResponse(res, 200, {
           success: true,
-          role: resolved.role ?? role,
-          userId: resolved.userId ?? (userId || undefined),
-          ticketId: resolved.ticketId ?? ticketId,
+          role,
+          userId,
+          ticketId,
+          trxId,
           link,
         });
       } catch (error) {

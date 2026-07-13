@@ -562,7 +562,7 @@
       async function getTelegramLink(trxId) {
         try {
           // Send request with role=customer and website userId=12345
-          const res = await fetch(`${API_URL}/api/telegram-link?role=customer&userId=12345&ticketId=${trxId}`);
+          const res = await fetch(`${API_URL}/api/telegram-link?role=customer&userId=12345&trxId=${trxId}`);
           const data = await res.json();
 
           if (data.success) {

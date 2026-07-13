@@ -236,7 +236,8 @@ async function forwardCustomerMessageToAdmin(userId: number, userName: string, t
 }
 
 bot.command('start', async (ctx) => {
-  const payload = parsePayload(ctx.message?.text?.replace('/start', '').trim());
+  const rawPayload = ctx.message?.text?.replace('/start', '').trim() || '';
+  const payload = parsePayload(rawPayload);
   const telegramId = ctx.from?.id ?? 0;
   const username = ctx.from?.username ?? 'user';
   const customerName = ctx.from?.first_name ?? username;
@@ -302,23 +303,51 @@ bot.command('start', async (ctx) => {
     return;
   }
 
+  let initialMessage = 'Customer membuka chat dari Telegram.';
+  let isTrxQuery = false;
+  let trxStatus = '';
+  let trxIdStr = '';
+  
+  if (rawPayload.startsWith('trx_')) {
+    trxIdStr = rawPayload.replace('trx_', '');
+    const transaction = await getTransactionByTrxId(trxIdStr);
+    if (transaction) {
+      initialMessage = `Customer menanyakan status transaksi ${trxIdStr} (Status: ${transaction.status ?? 'unknown'}).`;
+      isTrxQuery = true;
+      trxStatus = transaction.status ?? 'unknown';
+    }
+  }
+
   const ticket = await getOrCreateCustomerTicket(
     telegramId,
     customerName,
-    'Customer membuka chat dari Telegram.',
+    initialMessage,
     payload.websiteUserId,
   );
 
   setUserSession(telegramId, 'customer', ticket.ticketId);
 
-  const welcomeMessage = config.csOffline
-    ? csOfflineTemplate()
-    : customerStartTemplate(customerName, ticket.ticketId);
+  if (isTrxQuery) {
+    const trxAskMessage = [
+      '💬 **Tanya CS Terkait Transaksi**',
+      '',
+      `Anda ingin menanyakan transaksi **${trxIdStr}**.`,
+      `Status pesanan saat ini: **${trxStatus.toUpperCase()}**.`,
+      '',
+      'Silakan tuliskan pertanyaan atau kendala Anda di bawah ini, tim CS kami akan segera membantu!'
+    ].join('\n');
+    
+    await ctx.reply(trxAskMessage, { parse_mode: 'Markdown' });
+  } else {
+    const welcomeMessage = config.csOffline
+      ? csOfflineTemplate()
+      : customerStartTemplate(customerName, ticket.ticketId);
 
-  await ctx.reply(welcomeMessage, {
-    parse_mode: 'Markdown',
-    reply_markup: buildMainMenu('customer'),
-  });
+    await ctx.reply(welcomeMessage, {
+      parse_mode: 'Markdown',
+      reply_markup: buildMainMenu('customer'),
+    });
+  }
 });
 
 bot.command('menu', async (ctx) => {

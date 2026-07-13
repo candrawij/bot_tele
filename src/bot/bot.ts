@@ -40,92 +40,133 @@ bot.catch((error) => {
 const adminReplyMap = new Map<number, { userId: number; ticketId: string; userName: string }>();
 
 const customerStartTemplate = (name: string, ticketId: string): string => [
-  '🎮 Selamat datang di TopUpGames!',
+  '🎮 Selamat datang di **TopUpGames**!',
   '',
-  'Saya adalah bot customer service. Saya akan menghubungkan Anda dengan tim CS kami.',
+  'Saya adalah asisten virtual CS TopUpGames. Saya siap membantu Anda terhubung dengan tim Customer Service kami.',
   '',
-  '📌 Pilih menu di bawah:',
-  '├── 💬 Hubungi CS → Kirim pesan ke admin',
-  '├── 📦 Cek Status Transaksi → Masukkan Transaction ID',
-  '├── ❓ FAQ → Pertanyaan umum',
-  '└── 🔙 Kembali ke Website → topupgames.com',
+  '📋 **Menu Layanan:**',
+  '├── 💬 **Hubungi CS** - Konsultasi dengan tim kami',
+  '├── 📦 **Cek Status** - Lacak transaksi Anda',
+  '├── ❓ **FAQ** - Pertanyaan yang sering diajukan',
+  '└── 🔙 **Website** - Kembali ke TopUpGames.com',
   '',
-  '⚠️ Jam operasional CS: 09:00 - 22:00 WIB',
-  'Respon tercepat di jam operasional.',
+  '🕐 **Jam Operasional CS:**',
+  'Senin - Minggu | 09:00 - 22:00 WIB',
   '',
-  `Ticket aktif Anda: ${ticketId}`,
+  `📌 **Tiket Aktif Anda:** #${ticketId}`,
+  '',
+  '💡 *Tips: Kirim pesan langsung untuk chat dengan CS kami.*',
 ].join('\n');
 
 const csOfflineTemplate = (): string => [
-  '⏰ Maaf, tim CS kami sedang off.',
+  '⏰ **Maaf, Tim CS Sedang Istirahat**',
   '',
-  'Tetapi Anda tetap bisa:',
-  '1. Kirim pesan sekarang → akan dibalas besok pagi',
-  '2. Cek FAQ di website: topupgames.com/faq',
-  '3. Cek status transaksi: topupgames.com/status',
+  'Jam operasional CS kami adalah:',
+  '📅 Senin - Minggu',
+  '🕐 09:00 - 22:00 WIB',
   '',
-  'Terima kasih! 🙏',
+  'Namun, Anda tetap dapat:',
+  '1. 📩 **Kirim pesan sekarang** - Akan kami balas besok pagi',
+  '2. 📖 **Baca FAQ** - Kunjungi topupgames.com/faq',
+  '3. 🔍 **Cek Status** - topupgames.com/status',
+  '',
+  'Terima kasih atas pengertiannya! 🙏',
 ].join('\n');
 
 const userToAdminTemplate = (userName: string, userId: number, message: string, ticketId: string): string => [
-  '📩 PESAN DARI USER',
+  '📩 **PESAN BARU DARI PELANGGAN**',
   '',
-  `👤 Nama: ${userName}`,
-  `🆔 User ID: ${userId}`,
-  '📱 Platform: Website / Telegram',
-  '📝 Pesan:',
+  '━━━━━━━━━━━━━━━━━━━━━',
+  `👤 **Nama:** ${userName}`,
+  `🆔 **User ID:** ${userId}`,
+  `📌 **Tiket:** #${ticketId}`,
+  '',
+  '━━━━━━━━━━━━━━━━━━━━━',
+  '📝 **Pesan:**',
   `"${message}"`,
   '',
-  '📎 Informasi tambahan:',
+  '━━━━━━━━━━━━━━━━━━━━━',
+  '📎 **Informasi Tambahan:**',
+  '• Platform: Telegram',
   '- WIB: saat ini',
   '- User aktif: ✅',
   '- Total transaksi user: 12',
   '',
-  `📌 Ticket: ${ticketId}`,
-  '📌 [Balas pesan ini untuk membalas user]',
+  '━━━━━━━━━━━━━━━━━━━━━',
+  '💬 *Balas pesan ini untuk membalas pelanggan.*',
 ].join('\n');
 
 const customerReplyTemplate = (name: string, replyText: string, ticketId: string): string => [
-  '📩 BALASAN DARI CS',
+  '📩 **BALASAN DARI TIM CS**',
   '',
+  '━━━━━━━━━━━━━━━━━━━━━',
   `Halo Kak ${name}! 👋`,
   '',
   replyText,
   '',
-  '---',
+  '━━━━━━━━━━━━━━━━━━━━━',
+  `📌 **Tiket:** #${ticketId}`,
+  '💬 *Balas pesan ini untuk melanjutkan percakapan.*',
   '',
-  '💬 Balas pesan ini untuk membalas CS kembali.',
-  '',
-  `Ticket: ${ticketId}`,
+  'Terima kasih telah menggunakan TopUpGames! 😊',
 ].join('\n');
 
 const transactionStatusTemplate = (): string => [
-  '📦 CEK STATUS TRANSAKSI',
+  '📦 **CEK STATUS TRANSAKSI**',
   '',
-  'Silakan masukkan Transaction ID Anda.',
-  'Contoh: TRX-987',
+  '━━━━━━━━━━━━━━━━━━━━━',
+  'Silakan masukkan **Transaction ID** Anda.',
   '',
-  'Atau kirimkan ID Game Anda, kami akan cari di sistem.',
+  '📌 Format: `TRX-XXXXXX`',
+  '📌 Contoh: `TRX-250713ABC`',
+  '',
+  '*Atau kirimkan ID Game Anda, kami akan bantu cari di sistem.*',
+  '',
+  '━━━━━━━━━━━━━━━━━━━━━',
+  '🔍 *Ketik Transaction ID Anda di sini.*',
 ].join('\n');
 
 const transactionDetailsTemplate = (trx: any): string => [
-  '📦 DETAIL TRANSAKSI',
+  '📦 **DETAIL TRANSAKSI**',
   '',
-  `🆔 ID Transaksi: ${trx.trxId}`,
-  `🎮 Game: ${trx.game.name}`,
-  `📦 Produk: ${trx.product.name}`,
-  `👤 ID Game User: ${trx.userGameId}`,
-  `💰 Nominal: Rp ${Number(trx.amount).toLocaleString('id-ID')}`,
-  `🚦 Status: ${trx.status.toUpperCase()}`,
-  `📅 Waktu: ${new Date(trx.createdAt).toLocaleString('id-ID')}`,
+  '━━━━━━━━━━━━━━━━━━━━━',
+  `🆔 **ID Transaksi:** ${trx.trxId}`,
+  `🎮 **Game:** ${trx.game.name}`,
+  `📦 **Produk:** ${trx.product.name}`,
+  `👤 **ID Game User:** ${trx.userGameId}`,
+  `💰 **Nominal:** Rp ${Number(trx.amount).toLocaleString('id-ID')}`,
+  `🚦 **Status:** ${trx.status === 'success' ? '✅' : trx.status === 'failed' ? '❌' : '⏳'} **${trx.status.toUpperCase()}**`,
+  `📅 **Waktu:** ${new Date(trx.createdAt).toLocaleString('id-ID')}`,
+  '',
+  '━━━━━━━━━━━━━━━━━━━━━',
+  '📌 **Keterangan:**',
+  'Proses otomatis < 30 detik setelah pembayaran berhasil.',
+  '',
+  '💬 *Ada masalah? Hubungi CS kami.*',
 ].join('\n');
 
 const faqTemplate = (): string => [
-  '❓ FAQ TopUpGames',
+  '❓ **Frequently Asked Questions (FAQ)**',
   '',
-  '1. Top up belum masuk? Cek transaction ID Anda.',
-  '2. Apakah refund bisa? Ya, CS akan menghubungi Anda jika perlu.',
-  '3. Kunjungi website: topupgames.com/faq',
+  '━━━━━━━━━━━━━━━━━━━━━',
+  '📌 **1. Bagaimana cara top up?**',
+  'Kunjungi website TopUpGames.com, pilih game, masukkan ID, pilih nominal, lalu bayar.',
+  '',
+  '📌 **2. Top up belum masuk, bagaimana?**',
+  'Cek status transaksi di website atau hubungi CS dengan menyertakan Transaction ID.',
+  '',
+  '📌 **3. Apakah bisa refund?**',
+  'Refund dapat dilakukan jika transaksi gagal diproses. Hubungi CS untuk bantuan.',
+  '',
+  '📌 **4. Metode pembayaran apa saja?**',
+  'QRIS, Transfer Bank (BCA, Mandiri, BRI), dan E-Wallet (DANA, OVO, GoPay).',
+  '',
+  '📌 **5. Berapa lama proses top up?**',
+  'Proses otomatis < 30 detik setelah pembayaran berhasil.',
+  '',
+  '━━━━━━━━━━━━━━━━━━━━━',
+  '🔗 **Info lengkap:** topupgames.com/faq',
+  '💬 **Butuh bantuan lain?** Chat langsung dengan CS di sini.',
 ].join('\n');
 
 function buildMainMenu(role: string): InlineKeyboard {
@@ -157,15 +198,24 @@ function buildMainMenu(role: string): InlineKeyboard {
 
 function buildCustomerPromptTemplate(): string {
   return [
-    'Format chat yang disarankan:',
-    '1. Nama lengkap',
-    '2. Nomor order / email',
-    '3. Detail keluhan atau pertanyaan',
+    '📝 **Format Chat yang Disarankan**',
     '',
-    'Contoh:',
-    'Nama: Joni',
-    'Order: #1234',
-    'Masalah: Top up belum masuk',
+    'Untuk membantu kami merespons lebih cepat, silakan gunakan format:',
+    '',
+    '---',
+    '📌 **Nama:** [Nama lengkap Anda]',
+    '🆔 **ID Game:** [ID game Anda]',
+    '📋 **Transaction ID:** [Jika ada transaksi terkait]',
+    '📝 **Keluhan/Pertanyaan:**',
+    '[Jelaskan masalah atau pertanyaan Anda dengan jelas]',
+    '',
+    '---',
+    '',
+    '📌 *Contoh:*',
+    'Nama: Joni Pratama',
+    'ID Game: 12345678 (Mobile Legends)',
+    'TRX: TRX250713ABC',
+    'Masalah: Saya sudah top up 30 menit lalu tapi diamond belum masuk. Mohon bantuannya.',
   ].join('\n');
 }
 
@@ -193,7 +243,33 @@ bot.command('start', async (ctx) => {
 
   if (payload.role === 'cs') {
     setUserSession(telegramId, 'cs');
-    await ctx.reply('Halo CS 👋\nSilakan pilih tugas yang tersedia.', {
+    const csAgent = await prisma.csAgent.findUnique({ where: { telegramId } });
+    const csName = csAgent?.name || ctx.from?.first_name || 'CS Agent';
+    const rating = csAgent?.rating ? Number(csAgent.rating).toFixed(1) : '0.0';
+    const currentTickets = csAgent?.currentTickets ?? 0;
+    const maxTickets = csAgent?.maxTickets ?? 5;
+
+    const csWelcome = [
+      '🎖️ **MODE CS - TopUpGames**',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      `Selamat datang, **${csName}**! 👋`,
+      '',
+      '📋 **Menu CS:**',
+      '├── 📚 **Tiket Terbuka** - Lihat antrean',
+      '├── ✅ **Ambil Tiket** - Ambil tiket pertama',
+      '├── 🧾 **Tiket Saya** - Tiket yang sedang ditangani',
+      '└── 📊 **Performa Saya** - Statistik kinerja',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      `📌 **Tiket Saat Ini:** ${currentTickets}/${maxTickets}`,
+      `⭐ **Rating Anda:** ${rating} ⭐`,
+      '',
+      '*Pilih menu di atas untuk melanjutkan.*'
+    ].join('\n');
+
+    await ctx.reply(csWelcome, {
+      parse_mode: 'Markdown',
       reply_markup: buildMainMenu('cs'),
     });
     return;
@@ -201,7 +277,26 @@ bot.command('start', async (ctx) => {
 
   if (payload.role === 'admin') {
     setUserSession(telegramId, 'admin');
-    await ctx.reply('Halo Admin 👋\nBerikut ringkasan tiket yang sedang berjalan.', {
+    const adminName = ctx.from?.first_name || 'Admin';
+    const adminWelcome = [
+      '🛡️ **MODE ADMIN - TopUpGames**',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      `Selamat datang, **${adminName}**! 👋`,
+      '',
+      '📋 **Menu Admin:**',
+      '├── 📊 **Dashboard** - Statistik real-time',
+      '├── 🧾 **Semua Tiket** - Lihat seluruh tiket',
+      '├── ⚠️ **Tiket Urgent** - Prioritas tinggi',
+      '├── 📦 **Semua Transaksi** - Monitoring transaksi',
+      '└── 👥 **Manajemen CS** - Kelola tim CS',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '📌 *Pilih menu di atas untuk melanjutkan.*'
+    ].join('\n');
+
+    await ctx.reply(adminWelcome, {
+      parse_mode: 'Markdown',
       reply_markup: buildMainMenu('admin'),
     });
     return;
@@ -221,6 +316,7 @@ bot.command('start', async (ctx) => {
     : customerStartTemplate(customerName, ticket.ticketId);
 
   await ctx.reply(welcomeMessage, {
+    parse_mode: 'Markdown',
     reply_markup: buildMainMenu('customer'),
   });
 });
@@ -231,14 +327,59 @@ bot.command('menu', async (ctx) => {
   const role = session?.role ?? 'customer';
 
   if (role === 'cs') {
-    await ctx.reply('Halo CS 👋\nSilakan pilih tugas yang tersedia.', {
+    const csAgent = await prisma.csAgent.findUnique({ where: { telegramId } });
+    const csName = csAgent?.name || ctx.from?.first_name || 'CS Agent';
+    const rating = csAgent?.rating ? Number(csAgent.rating).toFixed(1) : '0.0';
+    const currentTickets = csAgent?.currentTickets ?? 0;
+    const maxTickets = csAgent?.maxTickets ?? 5;
+
+    const csWelcome = [
+      '🎖️ **MODE CS - TopUpGames**',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      `Selamat datang, **${csName}**! 👋`,
+      '',
+      '📋 **Menu CS:**',
+      '├── 📚 **Tiket Terbuka** - Lihat antrean',
+      '├── ✅ **Ambil Tiket** - Ambil tiket pertama',
+      '├── 🧾 **Tiket Saya** - Tiket yang sedang ditangani',
+      '└── 📊 **Performa Saya** - Statistik kinerja',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      `📌 **Tiket Saat Ini:** ${currentTickets}/${maxTickets}`,
+      `⭐ **Rating Anda:** ${rating} ⭐`,
+      '',
+      '*Pilih menu di atas untuk melanjutkan.*'
+    ].join('\n');
+
+    await ctx.reply(csWelcome, {
+      parse_mode: 'Markdown',
       reply_markup: buildMainMenu('cs'),
     });
     return;
   }
 
   if (role === 'admin') {
-    await ctx.reply('Halo Admin 👋\nBerikut ringkasan tiket yang sedang berjalan.', {
+    const adminName = ctx.from?.first_name || 'Admin';
+    const adminWelcome = [
+      '🛡️ **MODE ADMIN - TopUpGames**',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      `Selamat datang, **${adminName}**! 👋`,
+      '',
+      '📋 **Menu Admin:**',
+      '├── 📊 **Dashboard** - Statistik real-time',
+      '├── 🧾 **Semua Tiket** - Lihat seluruh tiket',
+      '├── ⚠️ **Tiket Urgent** - Prioritas tinggi',
+      '├── 📦 **Semua Transaksi** - Monitoring transaksi',
+      '└── 👥 **Manajemen CS** - Kelola tim CS',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '📌 *Pilih menu di atas untuk melanjutkan.*'
+    ].join('\n');
+
+    await ctx.reply(adminWelcome, {
+      parse_mode: 'Markdown',
       reply_markup: buildMainMenu('admin'),
     });
     return;
@@ -250,14 +391,30 @@ bot.command('menu', async (ctx) => {
     : customerStartTemplate(ctx.from?.first_name ?? 'Customer', ticket?.ticketId ?? 'TCK-0000');
 
   await ctx.reply(welcomeMessage, {
+    parse_mode: 'Markdown',
     reply_markup: buildMainMenu('customer'),
   });
 });
 
 bot.command('help', async (ctx) => {
-  await ctx.reply(
-    'Perintah yang tersedia:\n/start - mulai chat\n/help - bantuan\n/status - cek status tiket Anda\n/menu - tampilkan template menu\n/admin - masuk ke menu admin\n/cs - masuk ke menu CS',
-  );
+  const helpText = [
+    '📖 **Daftar Perintah Bot**',
+    '',
+    '━━━━━━━━━━━━━━━━━━━━━',
+    '🔹 `/start` - Memulai chat & membuat tiket',
+    '🔹 `/menu` - Menampilkan menu utama',
+    '🔹 `/status` - Cek status tiket aktif',
+    '🔹 `/help` - Menampilkan bantuan ini',
+    '',
+    '━━━━━━━━━━━━━━━━━━━━━',
+    '**Khusus CS & Admin:**',
+    '🔸 `/cs` - Mode CS (ambil tiket, dll)',
+    '🔸 `/admin` - Mode Admin (dashboard, dll)',
+    '',
+    '━━━━━━━━━━━━━━━━━━━━━',
+    '📌 *Ketik perintah di atas untuk mengakses fitur.*'
+  ].join('\n');
+  await ctx.reply(helpText, { parse_mode: 'Markdown' });
 });
 
 bot.command('status', async (ctx) => {
@@ -265,7 +422,14 @@ bot.command('status', async (ctx) => {
   const ticket = await getCustomerTicket(telegramId);
 
   if (!ticket) {
-    await ctx.reply('Anda belum memiliki tiket aktif.');
+    const errorTicketText = [
+      '📋 **Belum Ada Tiket Aktif**',
+      '',
+      'Anda belum memiliki tiket CS yang aktif.',
+      '',
+      '💬 *Kirim pesan di sini untuk membuat tiket baru dan terhubung dengan CS kami.*'
+    ].join('\n');
+    await ctx.reply(errorTicketText, { parse_mode: 'Markdown' });
     return;
   }
 
@@ -275,13 +439,58 @@ bot.command('status', async (ctx) => {
 bot.command('cs', async (ctx) => {
   const telegramId = ctx.from?.id ?? 0;
   setUserSession(telegramId, 'cs');
-  await ctx.reply('Halo CS 👋\nSilakan pilih tugas.', { reply_markup: buildMainMenu('cs') });
+  
+  const csAgent = await prisma.csAgent.findUnique({ where: { telegramId } });
+  const csName = csAgent?.name || ctx.from?.first_name || 'CS Agent';
+  const rating = csAgent?.rating ? Number(csAgent.rating).toFixed(1) : '0.0';
+  const currentTickets = csAgent?.currentTickets ?? 0;
+  const maxTickets = csAgent?.maxTickets ?? 5;
+
+  const csWelcome = [
+    '🎖️ **MODE CS - TopUpGames**',
+    '',
+    '━━━━━━━━━━━━━━━━━━━━━',
+    `Selamat datang, **${csName}**! 👋`,
+    '',
+    '📋 **Menu CS:**',
+    '├── 📚 **Tiket Terbuka** - Lihat antrean',
+    '├── ✅ **Ambil Tiket** - Ambil tiket pertama',
+    '├── 🧾 **Tiket Saya** - Tiket yang sedang ditangani',
+    '└── 📊 **Performa Saya** - Statistik kinerja',
+    '',
+    '━━━━━━━━━━━━━━━━━━━━━',
+    `📌 **Tiket Saat Ini:** ${currentTickets}/${maxTickets}`,
+    `⭐ **Rating Anda:** ${rating} ⭐`,
+    '',
+    '*Pilih menu di atas untuk melanjutkan.*'
+  ].join('\n');
+
+  await ctx.reply(csWelcome, { parse_mode: 'Markdown', reply_markup: buildMainMenu('cs') });
 });
 
 bot.command('admin', async (ctx) => {
   const telegramId = ctx.from?.id ?? 0;
   setUserSession(telegramId, 'admin');
-  await ctx.reply('Halo Admin 👋\nSilakan pilih menu.', { reply_markup: buildMainMenu('admin') });
+
+  const adminName = ctx.from?.first_name || 'Admin';
+  const adminWelcome = [
+    '🛡️ **MODE ADMIN - TopUpGames**',
+    '',
+    '━━━━━━━━━━━━━━━━━━━━━',
+    `Selamat datang, **${adminName}**! 👋`,
+    '',
+    '📋 **Menu Admin:**',
+    '├── 📊 **Dashboard** - Statistik real-time',
+    '├── 🧾 **Semua Tiket** - Lihat seluruh tiket',
+    '├── ⚠️ **Tiket Urgent** - Prioritas tinggi',
+    '├── 📦 **Semua Transaksi** - Monitoring transaksi',
+    '└── 👥 **Manajemen CS** - Kelola tim CS',
+    '',
+    '━━━━━━━━━━━━━━━━━━━━━',
+    '📌 *Pilih menu di atas untuk melanjutkan.*'
+  ].join('\n');
+
+  await ctx.reply(adminWelcome, { parse_mode: 'Markdown', reply_markup: buildMainMenu('admin') });
 });
 
 bot.on('callback_query:data', async (ctx) => {
@@ -425,7 +634,18 @@ bot.on('callback_query:data', async (ctx) => {
 
   if (data === 'customer_ticket') {
     const ticket = await getCustomerTicket(telegramId);
-    await ctx.reply(ticket ? ticketSummary(ticket) : 'Belum ada tiket aktif untuk akun Anda.');
+    if (ticket) {
+      await ctx.reply(ticketSummary(ticket));
+    } else {
+      const errorTicketText = [
+        '📋 **Belum Ada Tiket Aktif**',
+        '',
+        'Anda belum memiliki tiket CS yang aktif.',
+        '',
+        '💬 *Kirim pesan di sini untuk membuat tiket baru dan terhubung dengan CS kami.*'
+      ].join('\n');
+      await ctx.reply(errorTicketText, { parse_mode: 'Markdown' });
+    }
     await ctx.answerCallbackQuery('Menampilkan tiket Anda');
     return;
   }
@@ -477,38 +697,69 @@ bot.on('callback_query:data', async (ctx) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const successfulTrx = await prisma.transaction.findMany({
-      where: {
-        status: 'success',
-        updatedAt: { gte: today }
-      }
+    const allTrxToday = await prisma.transaction.findMany({
+      where: { updatedAt: { gte: today } }
     });
 
-    const totalTrxCount = successfulTrx.length;
-    const totalRevenue = successfulTrx.reduce((sum, t) => sum + Number(t.amount), 0);
+    const totalTrx = allTrxToday.length;
+    const successTrx = allTrxToday.filter(t => t.status === 'success');
+    const failedTrx = allTrxToday.filter(t => t.status === 'failed');
 
-    const openTicketsCount = await prisma.ticket.count({
-      where: { status: { in: ['open', 'assigned', 'pending'] } }
-    });
+    const successRate = totalTrx > 0 ? ((successTrx.length / totalTrx) * 100).toFixed(1) : '0.0';
+    const failedRate = totalTrx > 0 ? ((failedTrx.length / totalTrx) * 100).toFixed(1) : '0.0';
+    const totalRevenue = successTrx.reduce((sum, t) => sum + Number(t.amount), 0);
 
-    const csAgents = await prisma.csAgent.findMany({
-      where: { rating: { gt: 0 } }
-    });
-    let avgCsRating = 0;
-    if (csAgents.length > 0) {
-      avgCsRating = csAgents.reduce((sum, cs) => sum + Number(cs.rating), 0) / csAgents.length;
+    const openTickets = await prisma.ticket.count({ where: { status: 'open' } });
+    const assignedTickets = await prisma.ticket.count({ where: { status: 'assigned' } });
+    const urgentTickets = await prisma.ticket.count({ where: { status: { in: ['open', 'assigned', 'pending'] }, priority: 'high' } });
+    const closedTickets = await prisma.ticket.count({ where: { status: 'closed', closedAt: { gte: today } } });
+
+    const csAgents = await prisma.csAgent.findMany();
+    const csWithRatings = csAgents.filter(cs => cs.rating && Number(cs.rating) > 0);
+    let avgCsRating = 0.0;
+    if (csWithRatings.length > 0) {
+      avgCsRating = csWithRatings.reduce((sum, cs) => sum + Number(cs.rating), 0) / csWithRatings.length;
     }
 
+    const avgResponse = csAgents.length > 0 
+      ? (csAgents.reduce((sum, cs) => sum + (cs.avgResponseTime || 0), 0) / csAgents.length / 60).toFixed(1) 
+      : '0.0';
+
+    const activeTicketsCount = openTickets + assignedTickets;
+    const ticketPerCs = csAgents.length > 0 
+      ? (activeTicketsCount / csAgents.length).toFixed(1) 
+      : '0.0';
+
+    const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
     const dashboardText = [
-      '📊 *DASHBOARD STATISTIK HARI INI*',
+      '📊 **DASHBOARD ADMIN - TopUpGames**',
       '',
-      `📈 *Transaksi Sukses*: ${totalTrxCount} order`,
-      `💰 *Pendapatan*: Rp ${totalRevenue.toLocaleString('id-ID')}`,
+      '━━━━━━━━━━━━━━━━━━━━━',
+      `📅 **Hari Ini:** ${dateStr}`,
       '',
-      `🎫 *Tiket Aktif*: ${openTicketsCount} tiket`,
-      `⭐ *Rata-rata Performa CS*: ${avgCsRating.toFixed(2)} Bintang`,
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '📈 **Statistik Transaksi:**',
+      `├── Total Transaksi: **${totalTrx}** order`,
+      `├── Pendapatan: **Rp ${totalRevenue.toLocaleString('id-ID')}**`,
+      `├── Sukses: **${successRate}%** ✅`,
+      `└── Gagal: **${failedRate}%** ❌`,
       '',
-      '_Data diperbarui secara real-time_'
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '🎫 **Tiket CS:**',
+      `├── Open: **${openTickets}** 🟢`,
+      `├── Assigned: **${assignedTickets}** 🟡`,
+      `├── Urgent: **${urgentTickets}** 🔴`,
+      `└── Closed: **${closedTickets}** ✅`,
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '⭐ **Performa CS:**',
+      `├── Rata-rata Rating: **${avgCsRating.toFixed(1)}** ⭐`,
+      `├── Response Time: **${avgResponse}** menit`,
+      `└── Tiket/CS: **${ticketPerCs}** tiket`,
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '📌 *Data diperbarui secara real-time.*'
     ].join('\n');
 
     const keyboard = new InlineKeyboard().text('🔄 Refresh Data', 'admin_dashboard');
@@ -835,7 +1086,7 @@ bot.on('message:text', async (ctx) => {
   const role = session?.role ?? 'customer';
 
   if (!text) {
-    await ctx.reply('Pesan Anda kosong.');
+    await ctx.reply('⚠️ **Pesan tidak boleh kosong.**\n\nSilakan tulis pesan Anda dengan jelas agar CS dapat membantu dengan maksimal.', { parse_mode: 'Markdown' });
     return;
   }
 
@@ -855,7 +1106,7 @@ bot.on('message:text', async (ctx) => {
 
       if (products.length === 0) {
         updateUserSession(telegramId, { orderState: 'idle' });
-        await ctx.reply('Maaf, belum ada produk untuk game ini.');
+        await ctx.reply('⚠️ **Game Belum Memiliki Produk**\n\nMohon maaf, belum ada produk untuk game ini.', { parse_mode: 'Markdown' });
         return;
       }
 
@@ -874,9 +1125,20 @@ bot.on('message:text', async (ctx) => {
     if (/^trx/i.test(text)) {
       const transaction = await getTransactionByTrxId(text);
       if (transaction) {
-        await ctx.reply(transactionDetailsTemplate(transaction));
+        await ctx.reply(transactionDetailsTemplate(transaction), { parse_mode: 'Markdown' });
       } else {
-        await ctx.reply(`🔍 Transaksi dengan ID "${text}" tidak ditemukan.\nSilakan periksa kembali ID Transaksi Anda atau hubungi CS jika Anda butuh bantuan.`);
+        const errorTrxText = [
+          '🔍 **Transaksi Tidak Ditemukan**',
+          '',
+          `Mohon maaf, transaksi dengan ID **"${text}"** tidak ditemukan di sistem kami.`,
+          '',
+          '📌 **Kemungkinan:**',
+          '1. ID Transaksi yang Anda masukkan salah',
+          '2. Transaksi belum tercatat di sistem',
+          '',
+          '💡 *Silakan periksa kembali ID Transaksi Anda atau hubungi CS untuk bantuan.*'
+        ].join('\n');
+        await ctx.reply(errorTrxText, { parse_mode: 'Markdown' });
       }
       return;
     }
@@ -912,7 +1174,19 @@ bot.on('message:text', async (ctx) => {
     const ticket = await getTicketById(session?.ticketId ?? '');
 
     if (!ticket) {
-      await ctx.reply('Anda belum memilih tiket. Pilih tiket dari daftar terbuka terlebih dahulu.');
+      const csNoTicketText = [
+        '⚠️ **Anda Belum Memilih Tiket**',
+        '',
+        'Silakan ambil tiket terlebih dahulu sebelum membalas pesan pelanggan.',
+        '',
+        '📌 **Cara:**',
+        '1. Ketik `/cs` untuk masuk mode CS',
+        '2. Pilih **📚 Tiket Terbuka**',
+        '3. Pilih **✅ Ambil Tiket**',
+        '',
+        '*Setelah mengambil tiket, Anda dapat langsung membalas.*'
+      ].join('\n');
+      await ctx.reply(csNoTicketText, { parse_mode: 'Markdown' });
       return;
     }
 
@@ -927,10 +1201,38 @@ bot.on('message:text', async (ctx) => {
           text,
           ticket.ticketId,
         );
-        await bot.api.sendMessage(Number(user.telegramId), responseText);
-        await ctx.reply(`✅ Balasan berhasil dikirim ke customer.`);
+        try {
+          await bot.api.sendMessage(Number(user.telegramId), responseText, { parse_mode: 'Markdown' });
+          
+          const csSuccessText = [
+            '✅ **Balasan Berhasil Dikirim**',
+            '',
+            'Balasan Anda telah terkirim ke pelanggan.',
+            '',
+            `📌 **Tiket:** #${ticket.ticketId}`,
+            `👤 **Pelanggan:** ${user.name}`,
+            `🕐 **Waktu:** ${new Date().toLocaleTimeString('id-ID')} WIB`,
+            '',
+            '*Pelanggan akan mendapat notifikasi balasan Anda.*'
+          ].join('\n');
+          await ctx.reply(csSuccessText, { parse_mode: 'Markdown' });
+        } catch (e) {
+          const csFailText = [
+            '❌ **Gagal Mengirim Balasan**',
+            '',
+            'Mohon maaf, balasan Anda gagal terkirim ke pelanggan.',
+            '',
+            '📌 **Kemungkinan:**',
+            '1. Pelanggan telah memblokir bot',
+            '2. Pelanggan tidak aktif',
+            '3. Masalah teknis pada sistem',
+            '',
+            '💬 *Silakan coba lagi atau hubungi tim teknis.*'
+          ].join('\n');
+          await ctx.reply(csFailText, { parse_mode: 'Markdown' });
+        }
       } else {
-        await ctx.reply(`Gagal mengirim: User tidak ditemukan.`);
+        await ctx.reply('Gagal mengirim: User tidak ditemukan.');
       }
     } else {
       await ctx.reply(`Gagal mengirim: User tidak terhubung.`);
@@ -941,7 +1243,17 @@ bot.on('message:text', async (ctx) => {
   if (role === 'admin') {
     const ticket = await getTicketById(session?.ticketId ?? '');
     if (!ticket) {
-      await ctx.reply('Anda belum memilih tiket. Gunakan menu admin untuk melihat daftar tiket.');
+      const adminNoTicketText = [
+        '⚠️ **Notifikasi Admin**',
+        '',
+        'Anda mengirim pesan tanpa memilih tiket tertentu.',
+        '',
+        `📌 **Pesan Anda:**`,
+        `"${text}"`,
+        '',
+        '💡 *Gunakan menu admin untuk memilih tiket terlebih dahulu sebelum membalas.*'
+      ].join('\n');
+      await ctx.reply(adminNoTicketText, { parse_mode: 'Markdown' });
       return;
     }
 

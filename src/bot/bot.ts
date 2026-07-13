@@ -171,7 +171,10 @@ async function forwardCustomerMessageToAdmin(userId: number, userName: string, t
   }
 
   const adminText = userToAdminTemplate(userName, userId, message, ticketId);
-  const keyboard = new InlineKeyboard().text('✅ Selesaikan Tiket', `admin_close_ticket:${ticketId}`);
+  const keyboard = new InlineKeyboard()
+    .text('🙋‍♂️ Ambil Tiket', `cs_claim_ticket:${ticketId}`)
+    .row()
+    .text('✅ Selesaikan Tiket', `admin_close_ticket:${ticketId}`);
   const sentMessage = await bot.api.sendMessage(config.adminGroupChatId, adminText, {
     reply_markup: keyboard,
   });
@@ -364,6 +367,65 @@ bot.on('callback_query:data', async (ctx) => {
     return;
   }
 
+  if (data.startsWith('cs_claim_ticket:')) {
+    const ticketId = data.replace('cs_claim_ticket:', '');
+    const ticket = await getTicketById(ticketId);
+
+    if (!ticket) {
+      await ctx.answerCallbackQuery('Tiket tidak ditemukan.');
+      return;
+    }
+
+    if (ticket.status === 'closed') {
+      await ctx.answerCallbackQuery('Tiket ini sudah ditutup.');
+      return;
+    }
+
+    if (ticket.status === 'assigned') {
+      await ctx.answerCallbackQuery('Tiket ini sudah diambil CS lain.');
+      return;
+    }
+
+    const csTelegramId = ctx.from?.id ?? 0;
+    const csName = ctx.from?.first_name ?? 'CS Agent';
+
+    await assignTicket(ticketId, csTelegramId, csName);
+    setUserSession(csTelegramId, 'cs', ticketId);
+
+    let customerName = 'Customer';
+    if (ticket.userId) {
+      const user = await prisma.user.findUnique({ where: { id: ticket.userId } });
+      if (user) {
+        customerName = user.name;
+        if (user.telegramId) {
+          const customerText = `🙋‍♂️ Tiket Anda #${ticket.ticketId} telah diambil oleh CS *${csName}*.\nPercakapan Anda selanjutnya dialihkan ke CS secara langsung!`;
+          await bot.api.sendMessage(Number(user.telegramId), customerText, { parse_mode: 'Markdown' });
+        }
+      }
+    }
+
+    await bot.api.sendMessage(
+      csTelegramId,
+      `🙋‍♂️ Anda telah mengambil tiket *#${ticket.ticketId}* milik customer *${customerName}*.\nKetik pesan di sini untuk membalas mereka secara langsung.`
+    );
+
+    const originalText = ctx.callbackQuery.message?.text ?? '';
+    const updatedText = `${originalText}\n\n🙋‍♂️ *[DITANGANI OLEH: ${csName}]*`;
+    const newKeyboard = new InlineKeyboard().text('✅ Selesaikan Tiket', `admin_close_ticket:${ticketId}`);
+
+    try {
+      await ctx.editMessageText(updatedText, {
+        parse_mode: 'Markdown',
+        reply_markup: newKeyboard,
+      });
+    } catch (e) {
+      console.error('Failed to edit claim message:', e);
+    }
+
+    await ctx.answerCallbackQuery('Tiket berhasil diambil.');
+    return;
+  }
+
   if (data.startsWith('admin_close_ticket:')) {
     const ticketId = data.replace('admin_close_ticket:', '');
     const ticket = await getTicketById(ticketId);
@@ -401,6 +463,89 @@ bot.on('callback_query:data', async (ctx) => {
     }
 
     await ctx.answerCallbackQuery('Tiket berhasil ditutup.');
+    return;
+  }
+
+  if (data.startsWith('admin_trx_success:') || data.startsWith('admin_trx_failed:')) {
+    const isSuccess = data.startsWith('admin_trx_success:');
+    const trxId = isSuccess ? data.replace('admin_trx_success:', '') : data.replace('admin_trx_failed:', '');
+    
+    const trx = await prisma.transaction.findUnique({
+      where: { trxId },
+      include: { game: true, product: true, user: true },
+    });
+
+    if (!trx) {
+      await ctx.answerCallbackQuery('Transaksi tidak ditemukan.');
+      return;
+    }
+
+    if (trx.status !== 'pending') {
+      await ctx.answerCallbackQuery(`Transaksi ini sudah diproses (${trx.status}).`);
+      return;
+    }
+
+    const newStatus = isSuccess ? 'success' : 'failed';
+    await prisma.transaction.update({
+      where: { trxId },
+      data: { status: newStatus },
+    });
+
+    if (trx.user && trx.user.telegramId) {
+      const telegramId = Number(trx.user.telegramId);
+      let messageText = '';
+
+      if (isSuccess) {
+        messageText = [
+          '🔔 *UPDATE TRANSAKSI*',
+          '',
+          `Halo Kak ${trx.user.name || 'Pelanggan'}! 👋`,
+          `Transaksi Anda dengan ID *${trx.trxId}* telah *BERHASIL* diproses!`,
+          '',
+          `🎮 *Game*: ${trx.game.name}`,
+          `📦 *Produk*: ${trx.product.name}`,
+          `💰 *Nominal*: Rp ${Number(trx.amount).toLocaleString('id-ID')}`,
+          `🚦 *Status*: SUKSES`,
+          '',
+          'Terima kasih sudah berbelanja di TopUpGames! 🙏',
+        ].join('\n');
+      } else {
+        messageText = [
+          '🔔 *UPDATE TRANSAKSI*',
+          '',
+          `Halo Kak ${trx.user.name || 'Pelanggan'}!`,
+          `Transaksi Anda dengan ID *${trx.trxId}* *GAGAL* diproses.`,
+          '',
+          `🎮 *Game*: ${trx.game.name}`,
+          `📦 *Produk*: ${trx.product.name}`,
+          `🚦 *Status*: GAGAL`,
+          '',
+          'Silakan hubungi Customer Service kami untuk info lebih lanjut.',
+        ].join('\n');
+      }
+
+      try {
+        await bot.api.sendMessage(telegramId, messageText, { parse_mode: 'Markdown' });
+      } catch (e) {
+        console.error('Failed to send notification to customer:', e);
+      }
+    }
+
+    const originalText = ctx.callbackQuery.message?.text ?? '';
+    const adminName = ctx.from?.first_name || 'Admin';
+    const statusText = isSuccess ? `✅ *[SUKSES]*` : `❌ *[GAGAL]*`;
+    const updatedText = `${originalText}\n\n${statusText}\nDiproses oleh: ${adminName}`;
+    
+    try {
+      await ctx.editMessageText(updatedText, {
+        parse_mode: 'Markdown',
+        reply_markup: undefined,
+      });
+    } catch (e) {
+      console.error('Failed to edit admin transaction message:', e);
+    }
+
+    await ctx.answerCallbackQuery(`Transaksi berhasil diproses (${newStatus}).`);
     return;
   }
 
@@ -462,6 +607,17 @@ bot.on('message:text', async (ctx) => {
     const ticket = await getOrCreateCustomerTicket(telegramId, ctx.from?.first_name ?? 'Customer', text);
     await appendMessage(ticket.ticketId, 'customer', text);
 
+    if (ticket.status === 'assigned' && ticket.csAgentId) {
+      const csAgent = await prisma.csAgent.findUnique({ where: { id: ticket.csAgentId } });
+      if (csAgent && csAgent.telegramId) {
+        const csTelegramId = Number(csAgent.telegramId);
+        const customerName = ctx.from?.first_name || 'Customer';
+        const csText = `📩 *Pesan Baru dari Customer (${customerName}):*\n\n${text}`;
+        await bot.api.sendMessage(csTelegramId, csText, { parse_mode: 'Markdown' });
+        return;
+      }
+    }
+
     await forwardCustomerMessageToAdmin(
       telegramId,
       ctx.from?.first_name ?? 'Customer',
@@ -485,7 +641,23 @@ bot.on('message:text', async (ctx) => {
 
     await appendMessage(ticket.ticketId, 'cs', text);
     await updateTicketStatus(ticket.ticketId, 'pending');
-    await ctx.reply(`Balasan Anda telah disimpan ke tiket ${ticket.ticketId}.`);
+
+    if (ticket.userId) {
+      const user = await prisma.user.findUnique({ where: { id: ticket.userId } });
+      if (user && user.telegramId) {
+        const responseText = customerReplyTemplate(
+          user.name,
+          text,
+          ticket.ticketId,
+        );
+        await bot.api.sendMessage(Number(user.telegramId), responseText);
+        await ctx.reply(`✅ Balasan berhasil dikirim ke customer.`);
+      } else {
+        await ctx.reply(`Gagal mengirim: User tidak ditemukan.`);
+      }
+    } else {
+      await ctx.reply(`Gagal mengirim: User tidak terhubung.`);
+    }
     return;
   }
 

@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { webhookCallback } from 'grammy';
+import { webhookCallback, InlineKeyboard } from 'grammy';
 import { bot } from '../bot/bot.js';
 import { config } from '../config.js';
 import { buildAdminDashboardLink, buildCsListLink, buildCustomerSupportLink } from '../services/telegramLink.js';
@@ -90,6 +90,17 @@ function resolveWebsiteUser(payload: Record<string, unknown>): { userId?: number
 
 export function startWebsiteApi(port = defaultPort): http.Server {
   const server = http.createServer(async (req, res) => {
+    // Enable CORS
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
     const requestUrl = new URL(req.url ?? '/', 'http://localhost');
 
     if (req.method === 'GET' && requestUrl.pathname === '/health') {
@@ -155,6 +166,140 @@ export function startWebsiteApi(port = defaultPort): http.Server {
         });
       }
 
+      return;
+    }
+
+    if (req.method === 'POST' && requestUrl.pathname === '/api/create-transaction') {
+      try {
+        const bodyText = await readBody(req);
+        const payload = bodyText ? JSON.parse(bodyText) : {};
+        const { userGameId, gameSlug, productName, amount } = payload;
+
+        if (!userGameId || !gameSlug || !productName || !amount) {
+          jsonResponse(res, 400, { success: false, message: 'Missing fields' });
+          return;
+        }
+
+        let game = await prisma.game.findUnique({ where: { slug: gameSlug } });
+        if (!game) {
+          game = await prisma.game.create({
+            data: {
+              name: gameSlug === 'mobile-legends' ? 'Mobile Legends' : gameSlug.toUpperCase(),
+              slug: gameSlug,
+              isActive: true,
+            },
+          });
+        }
+
+        let product = await prisma.product.findFirst({
+          where: { gameId: game.id, name: productName },
+        });
+        if (!product) {
+          product = await prisma.product.create({
+            data: {
+              gameId: game.id,
+              name: productName,
+              price: Number(amount),
+              isActive: true,
+            },
+          });
+        }
+
+        const firstUser = await prisma.user.findFirst();
+
+        const randomTrxId = `TRX-${Math.floor(100 + Math.random() * 900)}`;
+        const transaction = await prisma.transaction.create({
+          data: {
+            trxId: randomTrxId,
+            gameId: game.id,
+            productId: product.id,
+            userId: firstUser ? firstUser.id : null,
+            userGameId,
+            amount: Number(amount),
+            paymentMethod: 'Qris',
+            status: 'pending',
+          },
+          include: {
+            game: true,
+            product: true,
+          },
+        });
+
+        const serialized = JSON.parse(
+          JSON.stringify(transaction, (key, value) =>
+            typeof value === 'bigint' ? Number(value) : value
+          )
+        );
+
+        if (config.adminGroupChatId) {
+          const adminText = [
+            '💸 *PESANAN TRANSAKSI BARU*',
+            '',
+            `🆔 ID: ${randomTrxId}`,
+            `🎮 Game: ${game.name}`,
+            `📦 Produk: ${product.name}`,
+            `👤 ID Game User: ${userGameId}`,
+            `💰 Nominal: Rp ${Number(amount).toLocaleString('id-ID')}`,
+            `🚦 Status: PENDING`,
+            '',
+            'Silakan proses pesanan ini:'
+          ].join('\n');
+
+          const keyboard = new InlineKeyboard()
+            .text('✅ Proses (Sukses)', `admin_trx_success:${randomTrxId}`)
+            .text('❌ Tolak (Gagal)', `admin_trx_failed:${randomTrxId}`);
+
+          try {
+            await bot.api.sendMessage(config.adminGroupChatId, adminText, {
+              parse_mode: 'Markdown',
+              reply_markup: keyboard,
+            });
+          } catch (e) {
+            console.error('Failed to send admin transaction notification:', e);
+          }
+        }
+
+        jsonResponse(res, 200, {
+          success: true,
+          transaction: serialized,
+        });
+      } catch (error) {
+        jsonResponse(res, 500, {
+          success: false,
+          message: error instanceof Error ? error.message : 'server error',
+        });
+      }
+      return;
+    }
+
+    if (req.method === 'GET' && requestUrl.pathname === '/api/transactions') {
+      try {
+        const transactions = await prisma.transaction.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          include: {
+            game: true,
+            product: true,
+            user: true,
+          },
+        });
+
+        const serialized = JSON.parse(
+          JSON.stringify(transactions, (key, value) =>
+            typeof value === 'bigint' ? Number(value) : value
+          )
+        );
+
+        jsonResponse(res, 200, {
+          success: true,
+          transactions: serialized,
+        });
+      } catch (error) {
+        jsonResponse(res, 500, {
+          success: false,
+          message: error instanceof Error ? error.message : 'server error',
+        });
+      }
       return;
     }
 

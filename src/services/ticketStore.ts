@@ -145,14 +145,23 @@ export async function appendMessage(ticketId: string, sender: MessageSender, tex
   return updatedTicket as unknown as TicketRecord;
 }
 
-export async function assignTicket(ticketId: string, csId: number): Promise<TicketRecord | null> {
-  const csAgent = await prisma.csAgent.findUnique({ where: { telegramId: csId } });
-  const csAgentId = csAgent ? csAgent.id : undefined;
+export async function assignTicket(ticketId: string, csId: number, csName?: string): Promise<TicketRecord | null> {
+  let csAgent = await prisma.csAgent.findUnique({ where: { telegramId: csId } });
+  if (!csAgent) {
+    csAgent = await prisma.csAgent.create({
+      data: {
+        telegramId: csId,
+        name: csName || `CS Agent ${csId}`,
+        email: `${csId}@cs.telegram.local`,
+        status: 'online',
+      }
+    });
+  }
 
   const ticket = await prisma.ticket.update({
     where: { ticketId },
     data: {
-      csAgentId,
+      csAgentId: csAgent.id,
       status: 'assigned',
       assignedAt: new Date()
     },

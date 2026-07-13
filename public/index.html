@@ -3,98 +3,327 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BotTele Support</title>
+    <title>TopUpGames - Portal Transaksi & Support</title>
+    <!-- Import Google Font Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
       :root {
-        color-scheme: light;
-        --bg: #f7f9fc;
-        --card: #ffffff;
-        --text: #14213d;
-        --muted: #56657a;
-        --primary: #2563eb;
-        --primary-dark: #1d4ed8;
-        --shadow: 0 14px 40px rgba(6, 24, 66, 0.12);
+        --bg-main: #0a0f1d;
+        --bg-card: #13192b;
+        --bg-input: #1a223f;
+        --primary: #6366f1;
+        --primary-hover: #4f46e5;
+        --success: #10b981;
+        --failed: #ef4444;
+        --warning: #f59e0b;
+        --text-main: #f3f4f6;
+        --text-muted: #9ca3af;
+        --border: #2d3748;
+        --font-title: 'Outfit', sans-serif;
+        --font-body: 'Inter', sans-serif;
+        --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
       }
 
-      * { box-sizing: border-box; }
-      body {
+      * {
+        box-sizing: border-box;
         margin: 0;
-        font-family: Arial, Helvetica, sans-serif;
-        background: linear-gradient(180deg, #eff6ff 0%, var(--bg) 100%);
-        color: var(--text);
+        padding: 0;
       }
 
-      .shell {
+      body {
+        background-color: var(--bg-main);
+        color: var(--text-main);
+        font-family: var(--font-body);
         min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      header {
+        padding: 24px 5%;
+        border-bottom: 1px solid var(--border);
+        background: rgba(19, 25, 43, 0.8);
+        backdrop-filter: blur(10px);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .logo {
+        font-family: var(--font-title);
+        font-size: 24px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        letter-spacing: 0.5px;
+      }
+
+      .badge-api {
+        padding: 6px 12px;
+        background: #1e1b4b;
+        color: #818cf8;
+        border: 1px solid #3730a3;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .container {
+        max-width: 1200px;
+        width: 90%;
+        margin: 40px auto;
         display: grid;
-        place-items: center;
-        padding: 32px 20px;
+        grid-template-columns: 1.2fr 1.8fr;
+        gap: 32px;
+      }
+
+      @media (max-width: 900px) {
+        .container {
+          grid-template-columns: 1fr;
+        }
       }
 
       .card {
-        width: min(720px, 100%);
-        background: var(--card);
-        border-radius: 24px;
-        padding: 40px;
+        background-color: var(--bg-card);
+        border-radius: 20px;
+        padding: 32px;
+        border: 1px solid var(--border);
         box-shadow: var(--shadow);
       }
 
-      .eyebrow {
-        display: inline-block;
-        padding: 6px 12px;
-        background: #dbeafe;
-        color: #1e40af;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        margin-bottom: 16px;
-      }
-
-      h1 {
-        margin: 0 0 12px;
-        font-size: clamp(2rem, 4vw, 3rem);
-      }
-
-      p {
-        margin: 0 0 24px;
-        color: var(--muted);
-        line-height: 1.7;
-      }
-
-      .actions {
+      h2 {
+        font-family: var(--font-title);
+        font-size: 22px;
+        margin-bottom: 24px;
         display: flex;
-        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      label {
+        display: block;
+        font-size: 14px;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+        font-weight: 500;
+      }
+
+      input, select {
+        width: 100%;
+        padding: 14px;
+        background-color: var(--bg-input);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        color: white;
+        font-family: var(--font-body);
+        font-size: 15px;
+        transition: border-color 0.2s;
+      }
+
+      input:focus, select:focus {
+        outline: none;
+        border-color: var(--primary);
+      }
+
+      .grid-products {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
         gap: 12px;
+        margin-top: 8px;
+      }
+
+      .product-item {
+        background-color: var(--bg-input);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: left;
+      }
+
+      .product-item.active {
+        border-color: var(--primary);
+        background: rgba(99, 102, 241, 0.1);
+        box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+      }
+
+      .product-name {
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+
+      .product-price {
+        font-size: 13px;
+        color: var(--text-muted);
       }
 
       .btn {
-        text-decoration: none;
+        width: 100%;
+        padding: 16px;
+        background-color: var(--primary);
+        color: white;
         border: none;
         border-radius: 12px;
-        padding: 14px 18px;
+        font-family: var(--font-title);
+        font-size: 16px;
         font-weight: 700;
-        transition: 0.18s ease;
+        cursor: pointer;
+        transition: background-color 0.2s, transform 0.1s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .btn:hover {
+        background-color: var(--primary-hover);
+      }
+
+      .btn:active {
+        transform: scale(0.98);
+      }
+
+      .transaction-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        max-height: 580px;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+
+      /* Custom scrollbar */
+      .transaction-list::-webkit-scrollbar {
+        width: 6px;
+      }
+      .transaction-list::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .transaction-list::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 3px;
+      }
+
+      .empty-state {
+        color: var(--text-muted);
+        text-align: center;
+        padding: 40px 0;
+        font-size: 15px;
+      }
+
+      .trx-card {
+        background-color: var(--bg-input);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .trx-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px dashed var(--border);
+        padding-bottom: 10px;
+      }
+
+      .trx-id {
+        font-family: var(--font-title);
+        font-weight: 700;
+        color: #818cf8;
+      }
+
+      .trx-status {
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .status-pending { background-color: rgba(245, 158, 11, 0.15); color: var(--warning); }
+      .status-success { background-color: rgba(16, 185, 129, 0.15); color: var(--success); }
+      .status-failed { background-color: rgba(239, 68, 68, 0.15); color: var(--failed); }
+
+      .trx-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        font-size: 14px;
+      }
+
+      .trx-label { color: var(--text-muted); }
+      .trx-value { font-weight: 600; text-align: right; }
+
+      .trx-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .btn-sm {
+        flex: 1;
+        padding: 10px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--text-main);
+        transition: all 0.2s;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        cursor: pointer;
+        gap: 4px;
+        text-decoration: none;
       }
 
-      .btn-primary {
-        background: var(--primary);
+      .btn-sm-success {
+        background-color: rgba(16, 185, 129, 0.1);
+        border-color: var(--success);
+        color: var(--success);
+      }
+      .btn-sm-success:hover {
+        background-color: var(--success);
         color: white;
       }
 
-      .btn-primary:hover { background: var(--primary-dark); }
-
-      .btn-secondary {
-        background: #e5e7eb;
-        color: var(--text);
+      .btn-sm-primary {
+        background-color: rgba(99, 102, 241, 0.1);
+        border-color: var(--primary);
+        color: var(--primary);
+      }
+      .btn-sm-primary:hover {
+        background-color: var(--primary);
+        color: white;
       }
 
-      .btn-secondary:hover { background: #d1d5db; }
+      footer {
+        padding: 24px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 13px;
+        border-top: 1px solid var(--border);
+        background-color: var(--bg-card);
+      }
 
       .floating {
         position: fixed;
@@ -103,47 +332,273 @@
         z-index: 10;
       }
 
-      .floating a {
+      .floating button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         width: 68px;
         height: 68px;
         border-radius: 50%;
-        background: #111827;
         color: white;
-        text-decoration: none;
-        font-size: 12px;
+        font-size: 14px;
         font-weight: 700;
-        box-shadow: 0 12px 35px rgba(17, 24, 39, 0.28);
+        box-shadow: 0 12px 35px rgba(99, 102, 241, 0.4);
+        border: none;
+        cursor: pointer;
+        font-family: var(--font-title);
+        background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+
+      .floating button:hover {
+        transform: scale(1.08);
+        box-shadow: 0 16px 40px rgba(99, 102, 241, 0.6);
       }
     </style>
   </head>
   <body>
-    <main class="shell">
-      <section class="card">
-        <div class="eyebrow">Support Telegram</div>
-        <h1>Website support yang langsung terhubung ke bot Telegram</h1>
-        <p>
-          Halaman home ini dibuat sederhana supaya pengunjung bisa langsung masuk ke bot Telegram,
-          melanjutkan percakapan ke CS, atau menampilkan dashboard admin dengan satu klik.
-        </p>
+    <header>
+      <div class="logo">⚡ TopUpGames</div>
+      <div class="badge-api">Connected to Bot Tele API</div>
+    </header>
 
-        <div class="actions">
-          <a class="btn btn-primary" href="https://t.me/top_upin_bot?start=website-customer-user-12345-ticket-0001-open_ticket">
-            Chat dengan CS
-          </a>
-          <a class="btn btn-secondary" href="https://t.me/top_upin_bot?start=website-admin-dashboard">
-            Admin Chat
-          </a>
+    <div class="container">
+      <!-- PANEL TOP UP (LEFT) -->
+      <section class="card">
+        <h2>🎮 Order Top Up Game</h2>
+        
+        <div class="form-group">
+          <label for="gameId">Masukkan Game ID & Zone ID</label>
+          <input type="text" id="gameId" placeholder="Contoh: 123456789 (2001)" />
+        </div>
+
+        <div class="form-group">
+          <label>Pilih Game</label>
+          <select id="gameSelect">
+            <option value="mobile-legends">Mobile Legends</option>
+            <option value="free-fire">Free Fire</option>
+            <option value="pubg-mobile">PUBG Mobile</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Pilih Nominal Produk</label>
+          <div class="grid-products">
+            <div class="product-item active" data-name="86 Diamonds" data-price="20000">
+              <div class="product-name">86 Diamonds</div>
+              <div class="product-price">Rp 20.000</div>
+            </div>
+            <div class="product-item" data-name="172 Diamonds" data-price="40000">
+              <div class="product-name">172 Diamonds</div>
+              <div class="product-price">Rp 40.000</div>
+            </div>
+            <div class="product-item" data-name="257 Diamonds" data-price="60000">
+              <div class="product-name">257 Diamonds</div>
+              <div class="product-price">Rp 60.000</div>
+            </div>
+            <div class="product-item" data-name="706 Diamonds" data-price="150000">
+              <div class="product-name">706 Diamonds</div>
+              <div class="product-price">Rp 150.000</div>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn" id="btnOrder">
+          <span>🚀 Bayar Sekarang</span>
+        </button>
+      </section>
+
+      <!-- PANEL STATUS & NOTIFICATION (RIGHT) -->
+      <section class="card">
+        <h2>🧾 Riwayat Transaksi Lokal</h2>
+        <div class="transaction-list" id="transactionList">
+          <div class="empty-state">Belum ada transaksi di database MySQL. Silakan lakukan order terlebih dahulu!</div>
         </div>
       </section>
-    </main>
+    </div>
 
+    <footer>
+      <p>&copy; 2026 TopUpGames & BotTele Hermes integration. All rights reserved.</p>
+    </footer>
+
+    <script>
+      const API_URL = 'http://localhost:3001';
+
+      // 1. Handle product selection
+      const productItems = document.querySelectorAll('.product-item');
+      let selectedProduct = {
+        name: '86 Diamonds',
+        price: 20000
+      };
+
+      productItems.forEach(item => {
+        item.addEventListener('click', () => {
+          productItems.forEach(i => i.classList.remove('active'));
+          item.classList.add('active');
+          selectedProduct = {
+            name: item.getAttribute('data-name'),
+            price: Number(item.getAttribute('data-price'))
+          };
+        });
+      });
+
+      // 2. Load Transactions from MySQL Database via Bot API
+      async function loadTransactions() {
+        try {
+          const res = await fetch(`${API_URL}/api/transactions`);
+          const data = await res.json();
+          
+          if (data.success && data.transactions.length > 0) {
+            const listEl = document.getElementById('transactionList');
+            listEl.innerHTML = '';
+
+            data.transactions.forEach(trx => {
+              const card = document.createElement('div');
+              card.className = 'trx-card';
+              
+              // Format date
+              const timeString = new Date(trx.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+              
+              // Actions container
+              let actionsHtml = '';
+              if (trx.status === 'pending') {
+                actionsHtml = `
+                  <div class="trx-actions">
+                    <button class="btn-sm btn-sm-success" onclick="simulatePayment('${trx.trxId}', 'success')">💸 Bayar (Sukses)</button>
+                    <button class="btn-sm btn-sm-primary" onclick="getTelegramLink('${trx.trxId}')">💬 Tanya CS</button>
+                  </div>
+                `;
+              } else {
+                actionsHtml = `
+                  <div class="trx-actions">
+                    <button class="btn-sm btn-sm-primary" onclick="getTelegramLink('${trx.trxId}')" style="flex: 2;">💬 Tanya CS untuk Transaksi Ini</button>
+                  </div>
+                `;
+              }
+
+              card.innerHTML = `
+                <div class="trx-header">
+                  <span class="trx-id">${trx.trxId}</span>
+                  <span class="trx-status status-${trx.status}">${trx.status}</span>
+                </div>
+                <div class="trx-body">
+                  <span class="trx-label">Game</span>
+                  <span class="trx-value">${trx.game.name}</span>
+                  <span class="trx-label">Produk</span>
+                  <span class="trx-value">${trx.product.name}</span>
+                  <span class="trx-label">Game ID</span>
+                  <span class="trx-value">${trx.userGameId}</span>
+                  <span class="trx-label">Total</span>
+                  <span class="trx-value">Rp ${Number(trx.amount).toLocaleString('id-ID')}</span>
+                </div>
+                ${actionsHtml}
+              `;
+              listEl.appendChild(card);
+            });
+          }
+        } catch (error) {
+          console.error('Failed to load transactions:', error);
+        }
+      }
+
+      // 3. Make transaction order
+      document.getElementById('btnOrder').addEventListener('click', async () => {
+        const gameIdInput = document.getElementById('gameId').value.trim();
+        const gameSelect = document.getElementById('gameSelect').value;
+
+        if (!gameIdInput) {
+          alert('Mohon masukkan Game ID Anda terlebih dahulu!');
+          return;
+        }
+
+        try {
+          const payload = {
+            userGameId: gameIdInput,
+            gameSlug: gameSelect,
+            productName: selectedProduct.name,
+            amount: selectedProduct.price
+          };
+
+          const res = await fetch(`${API_URL}/api/create-transaction`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            alert(`Pemesanan sukses! ID Transaksi: ${data.transaction.trxId}. Silakan bayar dari menu riwayat transaksi.`);
+            loadTransactions();
+          } else {
+            alert('Gagal membuat transaksi: ' + data.message);
+          }
+        } catch (error) {
+          alert('Gagal terhubung ke API Bot: ' + error.message);
+        }
+      });
+
+      // 4. Simulate Payment Callback Webhook
+      async function simulatePayment(trxId, status) {
+        try {
+          const res = await fetch(`${API_URL}/api/notify-transaction`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trxId, status })
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            alert(`Simulasi Pembayaran Berhasil! Notifikasi status '${status}' telah dikirim ke Telegram.`);
+            loadTransactions();
+          } else {
+            alert('Gagal trigger notifikasi: ' + data.message);
+          }
+        } catch (error) {
+          alert('Gagal trigger notifikasi: ' + error.message);
+        }
+      }
+
+      // 5. Get dynamic secure telegram deep-link for support
+      async function getTelegramLink(trxId) {
+        try {
+          // Send request with role=customer and website userId=12345
+          const res = await fetch(`${API_URL}/api/telegram-link?role=customer&userId=12345&ticketId=${trxId}`);
+          const data = await res.json();
+
+          if (data.success) {
+            // Open link in new tab
+            window.open(data.link, '_blank');
+          } else {
+            alert('Gagal memuat link Telegram: ' + data.message);
+          }
+        } catch (error) {
+          alert('Gagal memuat link Telegram: ' + error.message);
+        }
+      }
+
+      async function getCsListTelegramLink() {
+        try {
+          const res = await fetch(`${API_URL}/api/telegram-link?role=cs`);
+          const data = await res.json();
+          if (data.success) {
+            window.open(data.link, '_blank');
+          } else {
+            alert('Gagal memuat link CS: ' + data.message);
+          }
+        } catch (error) {
+          alert('Gagal memuat link CS: ' + error.message);
+        }
+      }
+
+      // Initial Load
+      loadTransactions();
+      // Poll transactions every 5 seconds
+      setInterval(loadTransactions, 5000);
+    </script>
     <div class="floating">
-      <a href="https://t.me/top_upin_bot?start=website-cs-list" title="Open bot Telegram">
-        BOT
-      </a>
+      <button onclick="getCsListTelegramLink()" title="Hubungi CS">
+        💬 CS
+      </button>
     </div>
   </body>
 </html>

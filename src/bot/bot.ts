@@ -19,6 +19,7 @@ import {
 import { parsePayload } from '../services/telegramPayload.js';
 import { getTransactionByTrxId } from '../services/transactionStore.js';
 import { prisma } from '../services/prisma.js';
+import { escapeMd } from '../utils/escapeMd.js';
 
 export const bot = new Bot(config.telegramBotToken);
 
@@ -73,17 +74,18 @@ const csOfflineTemplate = (): string => [
   'Terima kasih atas pengertiannya! 🙏',
 ].join('\n');
 
-const userToAdminTemplate = (userName: string, userId: number, message: string, ticketId: string): string => [
+const userToAdminTemplate = (userName: string, userId: number, message: string, ticketId: string, trxInfo?: string): string => [
   '📩 **PESAN BARU DARI PELANGGAN**',
   '',
   '━━━━━━━━━━━━━━━━━━━━━',
-  `👤 **Nama:** ${userName}`,
+  `👤 **Nama:** ${escapeMd(userName)}`,
   `🆔 **User ID:** ${userId}`,
   `📌 **Tiket:** #${ticketId}`,
+  trxInfo ? `📦 **Trx:** ${escapeMd(trxInfo)}` : '',
   '',
   '━━━━━━━━━━━━━━━━━━━━━',
   '📝 **Pesan:**',
-  `"${message}"`,
+  `"${escapeMd(message)}"`,
   '',
   '━━━━━━━━━━━━━━━━━━━━━',
   '📎 **Informasi Tambahan:**',
@@ -94,7 +96,7 @@ const userToAdminTemplate = (userName: string, userId: number, message: string, 
   '',
   '━━━━━━━━━━━━━━━━━━━━━',
   '💬 *Balas pesan ini untuk membalas pelanggan.*',
-].join('\n');
+].filter(Boolean).join('\n');
 
 const customerReplyTemplate = (name: string, replyText: string, ticketId: string): string => [
   '📩 **BALASAN DARI TIM CS**',
@@ -219,20 +221,25 @@ function buildCustomerPromptTemplate(): string {
   ].join('\n');
 }
 
-async function forwardCustomerMessageToAdmin(userId: number, userName: string, ticketId: string, message: string): Promise<void> {
+async function forwardCustomerMessageToAdmin(userId: number, userName: string, ticketId: string, message: string, trxInfo?: string): Promise<void> {
   if (!config.adminGroupChatId) {
     return;
   }
 
-  const adminText = userToAdminTemplate(userName, userId, message, ticketId);
+  const adminText = userToAdminTemplate(userName, userId, message, ticketId, trxInfo);
   const keyboard = new InlineKeyboard()
     .text('🙋‍♂️ Ambil Tiket', `cs_claim_ticket:${ticketId}`)
     .row()
     .text('✅ Selesaikan Tiket', `admin_close_ticket:${ticketId}`);
-  const sentMessage = await bot.api.sendMessage(config.adminGroupChatId, adminText, {
-    reply_markup: keyboard,
-  });
-  adminReplyMap.set(sentMessage.message_id, { userId, ticketId, userName });
+  try {
+    const sentMessage = await bot.api.sendMessage(config.adminGroupChatId, adminText, {
+      reply_markup: keyboard,
+      parse_mode: 'Markdown',
+    });
+    adminReplyMap.set(sentMessage.message_id, { userId, ticketId, userName });
+  } catch (error) {
+    console.error('[bot] Gagal mengirim pesan ke grup admin:', error);
+  }
 }
 
 bot.command('start', async (ctx) => {
@@ -303,14 +310,14 @@ bot.command('start', async (ctx) => {
     return;
   }
 
+  let transaction: any = null;
   let initialMessage = 'Customer membuka chat dari Telegram.';
   let isTrxQuery = false;
   let trxStatus = '';
   let trxIdStr = '';
-  
   if (rawPayload.startsWith('trx_')) {
     trxIdStr = rawPayload.replace('trx_', '');
-    const transaction = await getTransactionByTrxId(trxIdStr);
+    transaction = await getTransactionByTrxId(trxIdStr);
     if (transaction) {
       initialMessage = `Customer menanyakan status transaksi ${trxIdStr} (Status: ${transaction.status ?? 'unknown'}).`;
       isTrxQuery = true;
@@ -328,13 +335,31 @@ bot.command('start', async (ctx) => {
   setUserSession(telegramId, 'customer', ticket.ticketId);
 
   if (isTrxQuery) {
+    const statusIcon = trxStatus.toLowerCase() === 'failed' ? '❌' : trxStatus.toLowerCase() === 'success' ? '✅' : '⏳';
+    const trxDate = transaction ? new Date(transaction.createdAt).toLocaleString('id-ID') : 'Tidak diketahui';
     const trxAskMessage = [
-      '💬 **Tanya CS Terkait Transaksi**',
+      '💬 **Konsultasi Transaksi - TopUpin**',
       '',
-      `Anda ingin menanyakan transaksi **${trxIdStr}**.`,
-      `Status pesanan saat ini: **${trxStatus.toUpperCase()}**.`,
+      '━━━━━━━━━━━━━━━━━━━━━',
+      `Halo Kak ${customerName}! 👋`,
       '',
-      'Silakan tuliskan pertanyaan atau kendala Anda di bawah ini, tim CS kami akan segera membantu!'
+      'Kami menerima permintaan konsultasi Anda terkait transaksi berikut:',
+      '',
+      '📋 **Detail Transaksi:**',
+      `🆔 **ID Transaksi:** ${trxIdStr}`,
+      `🚦 **Status:** ${statusIcon} ${trxStatus.toUpperCase()}`,
+      `📅 **Waktu:** ${trxDate}`,
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '📌 **Mohon berikan informasi tambahan:**',
+      '1. Apakah Anda sudah melakukan pembayaran?',
+      '2. Apakah ada bukti pembayaran yang bisa dilampirkan?',
+      '3. Jelaskan kendala yang Anda alami secara detail.',
+      '',
+      '📝 *Ketik pesan Anda di bawah ini, tim CS kami akan segera membantu.*',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '🕐 *Estimasi respons: < 5 menit (jam operasional)*'
     ].join('\n');
     
     await ctx.reply(trxAskMessage, { parse_mode: 'Markdown' });
@@ -681,14 +706,32 @@ bot.on('callback_query:data', async (ctx) => {
 
   if (data === 'cs_open_tickets') {
     const tickets = await listOpenTickets();
-    await ctx.reply(ticketListText(tickets));
+    if (tickets.length === 0) {
+      await ctx.reply('Tidak ada tiket yang terbuka.');
+    } else {
+      await ctx.reply('📚 **Daftar Tiket Terbuka:**', { parse_mode: 'Markdown' });
+      for (const ticket of tickets) {
+        const keyboard = new InlineKeyboard().text('🙋‍♂️ Ambil Tiket', `cs_claim_ticket:${ticket.ticketId}`);
+        const msgText = `📌 **${ticket.ticketId}**\nPrioritas: ${ticket.priority}\nPesan: ${ticket.messages[0]?.message ?? '-'}`;
+        await ctx.reply(msgText, { reply_markup: keyboard, parse_mode: 'Markdown' });
+      }
+    }
     await ctx.answerCallbackQuery('Daftar tiket terbuka ditampilkan');
     return;
   }
 
   if (data === 'cs_my_tickets') {
     const tickets = await listCsTickets(telegramId);
-    await ctx.reply(ticketListText(tickets));
+    if (tickets.length === 0) {
+      await ctx.reply('Tidak ada tiket yang sedang Anda tangani.');
+    } else {
+      await ctx.reply('🧾 **Daftar Tiket Anda:**', { parse_mode: 'Markdown' });
+      for (const ticket of tickets) {
+        const keyboard = new InlineKeyboard().text('✅ Selesaikan Tiket', `admin_close_ticket:${ticket.ticketId}`);
+        const msgText = `📌 **${ticket.ticketId}**\nPrioritas: ${ticket.priority}\nPesan Terakhir: ${ticket.messages[0]?.message ?? '-'}`;
+        await ctx.reply(msgText, { reply_markup: keyboard, parse_mode: 'Markdown' });
+      }
+    }
     await ctx.answerCallbackQuery('Daftar tiket Anda ditampilkan');
     return;
   }
@@ -839,28 +882,133 @@ bot.on('callback_query:data', async (ctx) => {
     setUserSession(csTelegramId, 'cs', ticketId);
 
     let customerName = 'Customer';
+    let user: any = null;
+    let totalTrx = 0;
+    
     if (ticket.userId) {
-      const user = await prisma.user.findUnique({ where: { id: ticket.userId } });
+      user = await prisma.user.findUnique({ where: { id: ticket.userId } });
       if (user) {
         customerName = user.name;
-        if (user.telegramId) {
-          const customerText = `🙋‍♂️ Tiket Anda #${ticket.ticketId} telah diambil oleh CS *${csName}*.\nPercakapan Anda selanjutnya dialihkan ke CS secara langsung!`;
-          await bot.api.sendMessage(Number(user.telegramId), customerText, { parse_mode: 'Markdown' });
-        }
+        totalTrx = await prisma.transaction.count({ where: { userId: user.id } });
       }
     }
 
-    await bot.api.sendMessage(
-      csTelegramId,
-      `🙋‍♂️ Anda telah mengambil tiket *#${ticket.ticketId}* milik customer *${customerName}*.\nKetik pesan di sini untuk membalas mereka secara langsung.`
-    );
+    const timestampStr = new Date().toLocaleString('id-ID');
 
-    const originalText = ctx.callbackQuery.message?.text ?? '';
-    const updatedText = `${originalText}\n\n🙋‍♂️ *[DITANGANI OLEH: ${csName}]*`;
+    // 2.A: Notifikasi ke Customer
+    if (user && user.telegramId) {
+      const customerText = [
+        '🙋‍♂️ **Tiket Anda Telah Diambil CS**',
+        '',
+        '━━━━━━━━━━━━━━━━━━━━━',
+        `Halo Kak ${customerName}! 👋`,
+        '',
+        `Kami informasikan bahwa tiket Anda telah diambil oleh CS **${csName}**.`,
+        '',
+        '📌 **Detail Tiket:**',
+        `🆔 **ID Tiket:** #${ticket.ticketId}`,
+        `👨‍💼 **CS:** ${csName} (ID: ${csTelegramId})`,
+        '📊 **Status:** 🟡 ASSIGNED',
+        `📅 **Waktu:** ${timestampStr}`,
+        '',
+        '━━━━━━━━━━━━━━━━━━━━━',
+        '📌 **Apa yang terjadi selanjutnya?**',
+        `💬 Percakapan Anda selanjutnya akan dialihkan langsung ke CS **${csName}**.`,
+        '',
+        'Tim CS akan segera merespons keluhan atau pertanyaan Anda.',
+        '',
+        '━━━━━━━━━━━━━━━━━━━━━',
+        '💡 *Balas pesan ini untuk melanjutkan percakapan dengan CS.*',
+        '',
+        'Terima kasih telah menggunakan layanan TopUpin! 😊'
+      ].join('\n');
+      await bot.api.sendMessage(Number(user.telegramId), customerText, { parse_mode: 'Markdown' });
+    }
+
+    // 2.B: Notifikasi ke CS
+    let rating = '5.0';
+    let todayCount = 0;
+    const csAgent = await prisma.csAgent.findUnique({ where: { telegramId: csTelegramId } });
+    if (csAgent) {
+      rating = csAgent.rating ? Number(csAgent.rating).toFixed(1) : '5.0';
+      todayCount = await prisma.ticket.count({
+        where: {
+          csAgentId: csAgent.id,
+          updatedAt: { gte: new Date(new Date().setHours(0,0,0,0)) }
+        }
+      });
+    }
+
+    const subjectText = ticket.messages[0]?.message.substring(0, 30) || 'General Inquiry';
+    const lastCustomerMsg = ticket.messages[ticket.messages.length - 1]?.message || '-';
+
+    const csNotificationText = [
+      '✅ **Tiket Berhasil Diambil**',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      `Halo **${csName}**! 👋`,
+      '',
+      'Anda telah berhasil mengambil tiket berikut:',
+      '',
+      '📌 **Detail Tiket:**',
+      `🆔 **ID Tiket:** #${ticket.ticketId}`,
+      `👤 **Customer:** ${customerName} (${user ? 'ID: ' + user.id + ' | TG: ' + user.telegramId : 'TG: unknown'})`,
+      `📝 **Subjek:** ${subjectText}...`,
+      '📊 **Status:** 🟡 ASSIGNED',
+      `📅 **Waktu:** ${timestampStr}`,
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '📋 **Pesan Customer:**',
+      `"${lastCustomerMsg}"`,
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '📌 **Informasi Tambahan:**',
+      '• Platform: Telegram',
+      `• Total Transaksi Customer: ${totalTrx}`,
+      '• Rating Customer: 5.0 ⭐',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '💬 *Ketik pesan di sini untuk membalas customer secara langsung.*',
+      '',
+      '**Tips:**',
+      '• Respons cepat = kepuasan pelanggan',
+      '• Gunakan template balasan yang tersedia',
+      '• Akhiri dengan solusi yang jelas',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '📊 **Statistik Anda:**',
+      `• Tiket Hari Ini: ${todayCount}`,
+      `• Rata-rata Rating: ${rating} ⭐`,
+      '• Response Time: < 3 menit',
+      '',
+      'Good luck! 🚀'
+    ].join('\n');
+
+    await bot.api.sendMessage(csTelegramId, csNotificationText, { parse_mode: 'Markdown' });
+
+    // 2.C: Notifikasi ke Grup Admin (Edit Message)
+    const adminNotificationText = [
+      '📢 **TIKET TELAH DIAMBIL CS**',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      `📌 **Tiket:** #${ticket.ticketId}`,
+      `👤 **Customer:** ${escapeMd(customerName)}`,
+      `👨‍💼 **Diambil oleh:** ${escapeMd(csName)}`,
+      '📊 **Status:** 🟡 ASSIGNED',
+      `📅 **Waktu:** ${timestampStr}`,
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '📋 **Pesan Customer:**',
+      `"${escapeMd(lastCustomerMsg)}"`,
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      `💬 *CS ${escapeMd(csName)} akan menangani tiket ini.*`
+    ].join('\n');
+
     const newKeyboard = new InlineKeyboard().text('✅ Selesaikan Tiket', `admin_close_ticket:${ticketId}`);
 
     try {
-      await ctx.editMessageText(updatedText, {
+      await ctx.editMessageText(adminNotificationText, {
         parse_mode: 'Markdown',
         reply_markup: newKeyboard,
       });
@@ -891,7 +1039,47 @@ bot.on('callback_query:data', async (ctx) => {
     if (ticket.userId) {
       const user = await prisma.user.findUnique({ where: { id: ticket.userId } });
       if (user && user.telegramId) {
-        const customerText = `✅ Pesan dari CS: Tiket bantuan Anda #${ticket.ticketId} telah diselesaikan.\n\nSeberapa puas Anda dengan pelayanan kami?`;
+        const diffMs = new Date().getTime() - new Date(ticket.createdAt ?? new Date()).getTime();
+        const diffMins = Math.max(1, Math.round(diffMs / 60000));
+        const handlingTime = `${diffMins} menit`;
+
+        let csName = 'CS Agent';
+        if (ticket.csAgentId) {
+          const agent = await prisma.csAgent.findUnique({ where: { id: ticket.csAgentId } });
+          if (agent) csName = agent.name;
+        }
+
+        const firstMsg = ticket.messages[0]?.message || 'Inquiry';
+        const solution = 'Kendala telah diselesaikan oleh tim CS.';
+
+        const customerText = [
+          '✅ **TIKET TELAH DISELESAIKAN**',
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━',
+          `Halo Kak ${user.name}! 👋`,
+          '',
+          `Kami informasikan bahwa tiket Anda #${ticket.ticketId} telah **SELESAI** ditangani.`,
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━',
+          '📋 **Ringkasan Penanganan:**',
+          `📌 **Masalah:** ${firstMsg.substring(0, 50)}...`,
+          `✅ **Solusi:** ${solution}`,
+          `📅 **Waktu Penanganan:** ${handlingTime}`,
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━',
+          '⭐ **Bagaimana pengalaman Anda dengan layanan kami?**',
+          '',
+          'Kami sangat menghargai masukan Anda untuk terus meningkatkan kualitas layanan.',
+          '',
+          '📌 *Tiket akan ditutup secara otomatis setelah Anda memberikan penilaian.*',
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━',
+          'Terima kasih telah mempercayakan TopUpin! 🎮',
+          '',
+          'Sampai jumpa di pembelian berikutnya!',
+          `**${csName}** - Tim CS TopUpin`
+        ].join('\n');
+
         const ratingKeyboard = new InlineKeyboard()
           .text('⭐ 1', `rate_cs:${ticket.ticketId}:1`)
           .text('⭐ 2', `rate_cs:${ticket.ticketId}:2`)
@@ -899,7 +1087,7 @@ bot.on('callback_query:data', async (ctx) => {
           .text('⭐ 4', `rate_cs:${ticket.ticketId}:4`)
           .text('⭐ 5', `rate_cs:${ticket.ticketId}:5`);
 
-        await bot.api.sendMessage(Number(user.telegramId), customerText, { reply_markup: ratingKeyboard });
+        await bot.api.sendMessage(Number(user.telegramId), customerText, { reply_markup: ratingKeyboard, parse_mode: 'Markdown' });
       }
     }
 
@@ -1180,22 +1368,64 @@ bot.on('message:text', async (ctx) => {
       if (csAgent && csAgent.telegramId) {
         const csTelegramId = Number(csAgent.telegramId);
         const customerName = ctx.from?.first_name || 'Customer';
-        const csText = `📩 *Pesan Baru dari Customer (${customerName}):*\n\n${text}`;
-        await bot.api.sendMessage(csTelegramId, csText, { parse_mode: 'Markdown' });
+        const csText = `📩 Pesan Baru dari Customer (${customerName}):\n\n${text}`;
+        try {
+          await bot.api.sendMessage(csTelegramId, csText);
+        } catch (e) {
+          console.error('[bot] Gagal mengirim pesan ke CS:', e);
+        }
+        // Send a small confirmation to customer if needed, or just let them know
+        // Normally, a live chat doesn't need "Pesan terkirim" for every message,
+        // but since they complained about no notification, let's give a small checkmark react if possible,
+        // or just a silent success. Let's reply with a small notification.
+        await ctx.reply('✅ Pesan terkirim ke CS.');
         return;
       }
     }
 
+    let trxInfo: string | undefined = undefined;
+    const firstMsg = ticket.messages[0]?.message || '';
+    const match = firstMsg.match(/transaksi (\S+) \(Status: ([^)]+)\)/i);
+    if (match) {
+      trxInfo = `${match[1]} (Status: ${match[2].toUpperCase()})`;
+    }
+
+    const customerName = ctx.from?.first_name ?? 'Customer';
+
     await forwardCustomerMessageToAdmin(
       telegramId,
-      ctx.from?.first_name ?? 'Customer',
+      customerName,
       ticket.ticketId,
       text,
+      trxInfo
     );
 
-    await ctx.reply(
-      `📩 Pesan Anda sudah masuk ke ticket ${ticket.ticketId}.\nTim CS akan menanggapi segera.\nKetik /status untuk mengecek progress ticket Anda.`,
-    );
+    const timestampStr = new Date(ticket.createdAt ?? new Date()).toLocaleString('id-ID');
+    const ticketConfirmationText = [
+      '✅ **Pesan Berhasil Diterima**',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      `Halo Kak ${customerName}! 👋`,
+      '',
+      'Pesan Anda telah berhasil masuk ke sistem kami.',
+      '',
+      '📌 **Detail Tiket:**',
+      `🆔 **ID Tiket:** #${ticket.ticketId}`,
+      `📅 **Dibuat:** ${timestampStr}`,
+      `📊 **Status:** 🟢 OPEN`,
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '📌 **Apa yang terjadi selanjutnya?**',
+      '1. Tim CS akan segera meninjau pesan Anda',
+      '2. CS akan mengambil tiket Anda',
+      '3. Anda akan mendapat notifikasi saat CS merespons',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '📌 *Ketik /status untuk mengecek progress tiket Anda.*',
+      '',
+      'Terima kasih telah menghubungi TopUpin! 🙏'
+    ].join('\n');
+    await ctx.reply(ticketConfirmationText, { parse_mode: 'Markdown' });
     return;
   }
 

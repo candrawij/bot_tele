@@ -181,7 +181,7 @@ export function startWebsiteApi(port = defaultPort): http.Server {
       try {
         const bodyText = await readBody(req);
         const payload = bodyText ? JSON.parse(bodyText) : {};
-        const { userGameId, gameSlug, productName, amount } = payload;
+        const { userGameId, gameSlug, productName, amount, trxId } = payload;
 
         if (!userGameId || !gameSlug || !productName || !amount) {
           jsonResponse(res, 400, { success: false, message: 'Missing fields' });
@@ -215,23 +215,32 @@ export function startWebsiteApi(port = defaultPort): http.Server {
 
         const firstUser = await prisma.user.findFirst();
 
-        const randomTrxId = `TRX-${Math.floor(100 + Math.random() * 900)}`;
-        const transaction = await prisma.transaction.create({
-          data: {
-            trxId: randomTrxId,
-            gameId: game.id,
-            productId: product.id,
-            userId: firstUser ? firstUser.id : null,
-            userGameId,
-            amount: Number(amount),
-            paymentMethod: 'Qris',
-            status: 'pending',
-          },
-          include: {
-            game: true,
-            product: true,
-          },
+        const finalTrxId = trxId ? String(trxId) : `TRX-${Math.floor(100 + Math.random() * 900)}`;
+        
+        // Cek apakah transaksi dengan ID ini sudah terdaftar
+        let transaction = await prisma.transaction.findUnique({
+          where: { trxId: finalTrxId },
+          include: { game: true, product: true }
         });
+
+        if (!transaction) {
+          transaction = await prisma.transaction.create({
+            data: {
+              trxId: finalTrxId,
+              gameId: game.id,
+              productId: product.id,
+              userId: firstUser ? firstUser.id : null,
+              userGameId,
+              amount: Number(amount),
+              paymentMethod: 'Qris',
+              status: 'pending',
+            },
+            include: {
+              game: true,
+              product: true,
+            },
+          });
+        }
 
         const serialized = JSON.parse(
           JSON.stringify(transaction, (key, value) =>
@@ -243,7 +252,7 @@ export function startWebsiteApi(port = defaultPort): http.Server {
           const adminText = [
             '💸 *PESANAN TRANSAKSI BARU*',
             '',
-            `🆔 ID: ${randomTrxId}`,
+            `🆔 ID: ${finalTrxId}`,
             `🎮 Game: ${game.name}`,
             `📦 Produk: ${product.name}`,
             `👤 ID Game User: ${userGameId}`,
@@ -254,8 +263,8 @@ export function startWebsiteApi(port = defaultPort): http.Server {
           ].join('\n');
 
           const keyboard = new InlineKeyboard()
-            .text('✅ Proses (Sukses)', `admin_trx_success:${randomTrxId}`)
-            .text('❌ Tolak (Gagal)', `admin_trx_failed:${randomTrxId}`);
+            .text('✅ Proses (Sukses)', `admin_trx_success:${finalTrxId}`)
+            .text('❌ Tolak (Gagal)', `admin_trx_failed:${finalTrxId}`);
 
           try {
             await bot.api.sendMessage(config.adminGroupChatId, adminText, {

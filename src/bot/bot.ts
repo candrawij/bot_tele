@@ -1,4 +1,5 @@
 import { Bot, InlineKeyboard, InputFile } from 'grammy';
+import axios from 'axios';
 import { config } from '../config.js';
 import {
   appendMessage,
@@ -1155,6 +1156,18 @@ bot.on('callback_query:data', async (ctx) => {
       where: { trxId },
       data: { status: newStatus },
     });
+
+    // Pemicu Webhook ke PHP Website
+    try {
+      await axios.post(`${config.websiteBaseUrl}/api/webhook_trx.php`, {
+        trxId: trxId,
+        status: newStatus,
+        secret: config.deepLinkSecret,
+      });
+      console.log(`[webhook] Berhasil mengirim update transaksi ${trxId} ke website.`);
+    } catch (e) {
+      console.error(`[webhook] Gagal mengirim update transaksi ${trxId} ke website:`, e instanceof Error ? e.message : e);
+    }
 
     if (trx.user && trx.user.telegramId) {
       const telegramId = Number(trx.user.telegramId);

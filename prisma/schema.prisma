@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model User {
+  id                 BigInt        @id @default(autoincrement())
+  email              String        @unique @db.VarChar(255)
+  password           String        @db.VarChar(255)
+  name               String        @db.VarChar(100)
+  phone              String?       @db.VarChar(20)
+  telegramId         BigInt?       @unique @map("telegram_id")
+  status             String?       @default("active") @db.VarChar(20)
+  totalTransactions  Int?          @default(0) @map("total_transactions")
+  totalSpent         Decimal?      @default(0) @db.Decimal(12, 2) @map("total_spent")
+  lastActiveAt       DateTime?     @map("last_active_at")
+  createdAt          DateTime?     @default(now()) @map("created_at")
+  updatedAt          DateTime?     @default(now()) @updatedAt @map("updated_at")
+
+  csAgents           CsAgent[]
+  tickets            Ticket[]
+  transactions       Transaction[]
+
+  @@map("users")
+}
+
+model Admin {
+  id           BigInt        @id @default(autoincrement())
+  email        String        @unique @db.VarChar(255)
+  password     String        @db.VarChar(255)
+  name         String        @db.VarChar(100)
+  phone        String?       @db.VarChar(20)
+  role         String?       @default("admin") @db.VarChar(30)
+  status       String?       @default("active") @db.VarChar(20)
+  lastLoginAt  DateTime?     @map("last_login_at")
+  createdAt    DateTime?     @default(now()) @map("created_at")
+  updatedAt    DateTime?     @default(now()) @updatedAt @map("updated_at")
+
+  csAgents     CsAgent[]
+  tickets      Ticket[]
+  adminLogs    AdminLog[]
+  transactions Transaction[]
+
+  @@map("admins")
+}
+
+model CsAgent {
+  id              BigInt         @id @default(autoincrement())
+  userId          BigInt?        @map("user_id")
+  adminId         BigInt?        @map("admin_id")
+  name            String         @db.VarChar(100)
+  email           String         @unique @db.VarChar(255)
+  telegramId      BigInt?        @unique @map("telegram_id")
+  status          String?        @default("online") @db.VarChar(20)
+  skills          Json?          
+  rating          Decimal?       @default(0) @db.Decimal(3, 2)
+  totalHandled    Int?           @default(0) @map("total_handled")
+  avgResponseTime Int?           @default(0) @map("avg_response_time")
+  maxTickets      Int?           @default(5) @map("max_tickets")
+  currentTickets  Int?           @default(0) @map("current_tickets")
+  shiftStart      DateTime?      @db.Time
+  shiftEnd        DateTime?      @db.Time
+  lastActiveAt    DateTime?      @map("last_active_at")
+  createdAt       DateTime?      @default(now()) @map("created_at")
+  updatedAt       DateTime?      @default(now()) @updatedAt @map("updated_at")
+
+  user            User?          @relation(fields: [userId], references: [id])
+  admin           Admin?         @relation(fields: [adminId], references: [id])
+  tickets         Ticket[]
+  performances    CsPerformance[]
+
+  @@map("cs_agents")
+}
+
+model Ticket {
+  id              BigInt           @id @default(autoincrement())
+  ticketId        String           @unique @map("ticket_id") @db.VarChar(20)
+  userId          BigInt?          @map("user_id")
+  adminId         BigInt?          @map("admin_id")
+  csAgentId       BigInt?          @map("cs_agent_id")
+  category        String           @db.VarChar(30)
+  priority        String?          @default("normal") @db.VarChar(20)
+  status          String?          @default("open") @db.VarChar(20)
+  subject         String?          @db.VarChar(255)
+  messagesCount   Int?             @default(0) @map("messages_count")
+  lastMessageAt   DateTime?        @map("last_message_at")
+  assignedAt      DateTime?        @map("assigned_at")
+  firstResponseAt DateTime?        @map("first_response_at")
+  closedAt        DateTime?        @map("closed_at")
+  source          String?          @default("telegram") @db.VarChar(30)
+  rating          Int?             @db.TinyInt
+  feedback        String?          @db.Text
+  createdAt       DateTime?        @default(now()) @map("created_at")
+  updatedAt       DateTime?        @default(now()) @updatedAt @map("updated_at")
+
+  user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admin           Admin?           @relation(fields: [adminId], references: [id])
+  csAgent         CsAgent?         @relation(fields: [csAgentId], references: [id])
+  messages        TicketMessage[]
+
+  @@map("tickets")
+}
+
+model TicketMessage {
+  id                 BigInt    @id @default(autoincrement())
+  ticketId           BigInt?   @map("ticket_id")
+  senderType         String    @map("sender_type") @db.VarChar(20)
+  senderId           BigInt?   @map("sender_id")
+  message            String    @db.Text
+  isForwarded        Boolean?  @default(false) @map("is_forwarded")
+  isInternal         Boolean?  @default(false) @map("is_internal")
+  telegramMessageId  Int?      @map("telegram_message_id")
+  readAt             DateTime? @map("read_at")
+  createdAt          DateTime? @default(now()) @map("created_at")
+
+  ticket             Ticket?   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("ticket_messages")
+}
+
+model AdminLog {
+  id         BigInt    @id @default(autoincrement())
+  adminId    BigInt?   @map("admin_id")
+  action     String    @db.VarChar(50)
+  targetType String?   @map("target_type") @db.VarChar(30)
+  targetId   BigInt?   @map("target_id")
+  details    Json?
+  ipAddress  String?   @map("ip_address") @db.VarChar(45)
+  userAgent  String?   @map("user_agent") @db.Text
+  createdAt  DateTime? @default(now()) @map("created_at")
+
+  admin      Admin?    @relation(fields: [adminId], references: [id])
+
+  @@map("admin_logs")
+}
+
+model CsPerformance {
+  id                BigInt    @id @default(autoincrement())
+  csAgentId         BigInt?   @map("cs_agent_id")
+  date              DateTime  @db.Date
+  ticketsHandled    Int?      @default(0) @map("tickets_handled")
+  ticketsClosed     Int?      @default(0) @map("tickets_closed")
+  avgResponseTime   Int?      @default(0) @map("avg_response_time")
+  avgResolutionTime Int?      @default(0) @map("avg_resolution_time")
+  satisfactionRate  Decimal?  @default(0) @db.Decimal(3, 2) @map("satisfaction_rate")
+  createdAt         DateTime? @default(now()) @map("created_at")
+  updatedAt         DateTime? @default(now()) @updatedAt @map("updated_at")
+
+  csAgent           CsAgent?  @relation(fields: [csAgentId], references: [id], onDelete: Cascade)
+
+  @@unique([csAgentId, date])
+  @@map("cs_performance")
+}
+
+model Game {
+  id        Int           @id @default(autoincrement())
+  name      String        @db.VarChar(100)
+  slug      String        @unique @db.VarChar(100)
+  logoUrl   String?       @map("logo_url") @db.VarChar(500)
+  isActive  Boolean?      @default(true) @map("is_active")
+  createdAt DateTime?     @default(now()) @map("created_at")
+
+  products  Product[]
+  transactions Transaction[]
+
+  @@map("games")
+}
+
+model Product {
+  id        Int           @id @default(autoincrement())
+  gameId    Int           @map("game_id")
+  name      String        @db.VarChar(200)
+  price     Int
+  stock     Int?          @default(-1)
+  isActive  Boolean?      @default(true) @map("is_active")
+  createdAt DateTime?     @default(now()) @map("created_at")
+
+  game      Game          @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@map("products")
+}
+
+model Transaction {
+  id                  BigInt    @id @default(autoincrement())
+  trxId               String    @unique @map("trx_id") @db.VarChar(50)
+  userId              BigInt?   @map("user_id")
+  adminId             BigInt?   @map("admin_id")
+  gameId              Int       @map("game_id")
+  productId           Int       @map("product_id")
+  userGameId          String    @map("user_game_id") @db.VarChar(100)
+  amount              Int
+  paymentMethod       String    @map("payment_method") @db.VarChar(50)
+  paymentCode         String?   @map("payment_code") @db.VarChar(100)
+  status              String?   @default("pending") @db.VarChar(20)
+  paymentExpiry       DateTime? @map("payment_expiry")
+  topupRequestSentAt  DateTime? @map("topup_request_sent_at")
+  topupResponse       String?   @map("topup_response") @db.Text
+  webhookPayload      String?   @map("webhook_payload") @db.Text
+  refundedAt          DateTime? @map("refunded_at")
+  refundedBy          BigInt?   @map("refunded_by")
+  createdAt           DateTime? @default(now()) @map("created_at")
+  updatedAt           DateTime? @default(now()) @updatedAt @map("updated_at")
+
+  user                User?     @relation(fields: [userId], references: [id])
+  admin               Admin?    @relation(fields: [adminId], references: [id])
+  game                Game      @relation(fields: [gameId], references: [id])
+  product             Product   @relation(fields: [productId], references: [id])
+
+  @@map("transactions")
+}

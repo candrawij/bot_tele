@@ -1,97 +1,22 @@
-import fs from 'node:fs';
-import path from 'node:path';
+import { prisma } from './prisma.js';
+import { Ticket, TicketMessage, Prisma } from '@prisma/client';
 
 export type UserRole = 'customer' | 'cs' | 'admin';
 export type TicketStatus = 'open' | 'assigned' | 'pending' | 'closed';
 export type TicketPriority = 'low' | 'normal' | 'high';
-export type MessageSender = 'customer' | 'cs' | 'admin';
+export type MessageSender = 'customer' | 'cs' | 'admin' | 'system';
 
-export interface TicketMessage {
-  sender: MessageSender;
-  text: string;
-  createdAt: string;
-}
+export type TicketRecord = Ticket & {
+  messages: TicketMessage[];
+};
 
-export interface TicketRecord {
-  id: string;
-  customerId: number;
-  customerName: string;
-  websiteUserId?: number;
-  status: TicketStatus;
-  priority: TicketPriority;
-  assignedCsId?: number;
-  createdAt: string;
-  updatedAt: string;
-  lastMessage: string;
-  conversation: TicketMessage[];
-}
-
+// Sessions ephemeral
 interface UserSession {
   role: UserRole;
   ticketId?: string;
 }
 
-const storagePath = path.resolve(process.cwd(), 'data', 'tickets.json');
-const tickets = new Map<string, TicketRecord>();
 const sessions = new Map<number, UserSession>();
-let ticketCounter = 1;
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
-function ensureStorageFile(): void {
-  fs.mkdirSync(path.dirname(storagePath), { recursive: true });
-
-  if (!fs.existsSync(storagePath)) {
-    fs.writeFileSync(storagePath, '[]', 'utf8');
-  }
-}
-
-function readStoredTickets(): TicketRecord[] {
-  ensureStorageFile();
-
-  try {
-    const fileContent = fs.readFileSync(storagePath, 'utf8');
-    if (!fileContent.trim()) {
-      return [];
-    }
-
-    const parsed = JSON.parse(fileContent) as TicketRecord[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function persistStoredTickets(): void {
-  ensureStorageFile();
-  fs.writeFileSync(storagePath, JSON.stringify(Array.from(tickets.values()), null, 2), 'utf8');
-}
-
-function hydrateTicketsFromDisk(): void {
-  const storedTickets = readStoredTickets();
-
-  for (const ticket of storedTickets) {
-    tickets.set(ticket.id, ticket);
-  }
-
-  const numericTicketIds = storedTickets
-    .map((ticket) => Number(ticket.id.replace(/\D/g, '')))
-    .filter((value) => Number.isFinite(value));
-
-  if (numericTicketIds.length > 0) {
-    ticketCounter = Math.max(...numericTicketIds) + 1;
-  }
-}
-
-hydrateTicketsFromDisk();
-
-function getTicketId(): string {
-  const nextId = String(ticketCounter).padStart(4, '0');
-  ticketCounter += 1;
-  return `TCK-${nextId}`;
-}
 
 export function setUserSession(telegramId: number, role: UserRole, ticketId?: string): void {
   sessions.set(telegramId, { role, ticketId });
@@ -105,125 +30,185 @@ export function clearUserSession(telegramId: number): void {
   sessions.delete(telegramId);
 }
 
-export function createTicket(
+export async function createTicket(
   customerId: number,
   customerName: string,
   initialMessage: string,
   websiteUserId?: number,
-): TicketRecord {
-  const ticket: TicketRecord = {
-    id: getTicketId(),
-    customerId,
-    customerName,
-    websiteUserId,
-    status: 'open',
-    priority: 'normal',
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-    lastMessage: initialMessage,
-    conversation: [
-      {
-        sender: 'customer',
-        text: initialMessage,
-        createdAt: nowIso(),
-      },
-    ],
-  };
+): Promise<TicketRecord> {
+  let user = await prisma.user.findUnique({ where: { telegramId: customerId } });
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        telegramId: customerId,
+        name: customerName,
+        email: `${customerId}@telegram.local`, 
+        password: 'dummy',
+      }
+    });
+  }
 
-  tickets.set(ticket.id, ticket);
-  persistStoredTickets();
-  return ticket;
+  const count = await prisma.ticket.count();
+  const ticketIdStr = `TCK-${String(count + 1).padStart(4, '0')}`;
+
+  const ticket = await prisma.ticket.create({
+    data: {
+      ticketId: ticketIdStr,
+      userId: user.id,
+      category: 'general',
+      messages: {
+        create: {
+          senderType: 'customer',
+          message: initialMessage
+        }
+      }
+    },
+    include: {
+      messages: true
+    }
+  });
+
+  return ticket as unknown as TicketRecord;
 }
 
-export function getTicketById(ticketId: string): TicketRecord | undefined {
-  return tickets.get(ticketId);
+export async function getTicketById(ticketId: string): Promise<TicketRecord | null> {
+  const ticket = await prisma.ticket.findUnique({
+    where: { ticketId },
+    include: { messages: true }
+  });
+  return ticket as unknown as TicketRecord | null;
 }
 
-export function listOpenTickets(): TicketRecord[] {
-  return Array.from(tickets.values())
-    .filter((ticket) => ticket.status !== 'closed')
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+export async function listOpenTickets(): Promise<TicketRecord[]> {
+  const tickets = await prisma.ticket.findMany({
+    where: { status: { not: 'closed' } },
+    orderBy: { createdAt: 'desc' },
+    include: { messages: true }
+  });
+  return tickets as unknown as TicketRecord[];
 }
 
-export function listAdminTickets(): TicketRecord[] {
-  return Array.from(tickets.values()).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+export async function listAdminTickets(): Promise<TicketRecord[]> {
+  const tickets = await prisma.ticket.findMany({
+    orderBy: { updatedAt: 'desc' },
+    include: { messages: true }
+  });
+  return tickets as unknown as TicketRecord[];
 }
 
-export function getCustomerTicket(customerId: number): TicketRecord | undefined {
-  return Array.from(tickets.values())
-    .filter((ticket) => ticket.customerId === customerId && ticket.status !== 'closed')
-    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+export async function getCustomerTicket(customerId: number): Promise<TicketRecord | null> {
+  const user = await prisma.user.findUnique({ where: { telegramId: customerId } });
+  if (!user) return null;
+
+  const ticket = await prisma.ticket.findFirst({
+    where: { 
+      userId: user.id,
+      status: { not: 'closed' } 
+    },
+    orderBy: { updatedAt: 'desc' },
+    include: { messages: true }
+  });
+  return ticket as unknown as TicketRecord | null;
 }
 
-export function getOrCreateCustomerTicket(
+export async function getOrCreateCustomerTicket(
   customerId: number,
   customerName: string,
   initialMessage: string,
   websiteUserId?: number,
-): TicketRecord {
-  const existing = getCustomerTicket(customerId);
+): Promise<TicketRecord> {
+  const existing = await getCustomerTicket(customerId);
   if (existing) {
     return existing;
   }
-
   return createTicket(customerId, customerName, initialMessage, websiteUserId);
 }
 
-export function appendMessage(ticketId: string, sender: MessageSender, text: string): TicketRecord | undefined {
-  const ticket = tickets.get(ticketId);
-  if (!ticket) {
-    return undefined;
-  }
+export async function appendMessage(ticketId: string, sender: MessageSender, text: string): Promise<TicketRecord | null> {
+  const ticket = await prisma.ticket.findUnique({ where: { ticketId } });
+  if (!ticket) return null;
 
-  ticket.conversation.push({ sender, text, createdAt: nowIso() });
-  ticket.lastMessage = text;
-  ticket.updatedAt = nowIso();
-  persistStoredTickets();
-  return ticket;
+  await prisma.ticketMessage.create({
+    data: {
+      ticketId: ticket.id,
+      senderType: sender,
+      message: text
+    }
+  });
+  
+  const updatedTicket = await prisma.ticket.update({
+    where: { ticketId },
+    data: { lastMessageAt: new Date(), updatedAt: new Date(), messagesCount: { increment: 1 } },
+    include: { messages: true }
+  });
+
+  return updatedTicket as unknown as TicketRecord;
 }
 
-export function assignTicket(ticketId: string, csId: number): TicketRecord | undefined {
-  const ticket = tickets.get(ticketId);
-  if (!ticket) {
-    return undefined;
-  }
+export async function assignTicket(ticketId: string, csId: number): Promise<TicketRecord | null> {
+  const csAgent = await prisma.csAgent.findUnique({ where: { telegramId: csId } });
+  const csAgentId = csAgent ? csAgent.id : undefined;
 
-  ticket.assignedCsId = csId;
-  ticket.status = 'assigned';
-  ticket.updatedAt = nowIso();
-  persistStoredTickets();
-  return ticket;
+  const ticket = await prisma.ticket.update({
+    where: { ticketId },
+    data: {
+      csAgentId,
+      status: 'assigned',
+      assignedAt: new Date()
+    },
+    include: { messages: true }
+  });
+  return ticket as unknown as TicketRecord | null;
 }
 
-export function updateTicketStatus(ticketId: string, status: TicketStatus): TicketRecord | undefined {
-  const ticket = tickets.get(ticketId);
-  if (!ticket) {
-    return undefined;
+export async function updateTicketStatus(ticketId: string, status: TicketStatus): Promise<TicketRecord | null> {
+  const data: any = { status };
+  if (status === 'closed') {
+    data.closedAt = new Date();
   }
-
-  ticket.status = status;
-  ticket.updatedAt = nowIso();
-  persistStoredTickets();
-  return ticket;
+  const ticket = await prisma.ticket.update({
+    where: { ticketId },
+    data,
+    include: { messages: true }
+  });
+  return ticket as unknown as TicketRecord | null;
 }
 
-export function ticketSummary(ticket: TicketRecord): string {
+export function ticketSummary(ticket: TicketRecord | any): string {
+  const lastMessage = ticket.messages?.length > 0 ? ticket.messages[ticket.messages.length - 1].message : '-';
   return [
-    `#${ticket.id}`,
+    `#${ticket.ticketId}`,
     `Status: ${ticket.status}`,
     `Prioritas: ${ticket.priority}`,
-    `Customer: ${ticket.customerName}`,
-    `Pesan terakhir: ${ticket.lastMessage}`,
+    `Pesan terakhir: ${lastMessage}`,
   ].join('\n');
 }
 
-export function ticketListText(ticketsToShow: TicketRecord[]): string {
+export function ticketListText(ticketsToShow: TicketRecord[] | any[]): string {
   if (ticketsToShow.length === 0) {
     return 'Belum ada tiket yang tersedia.';
   }
 
   return ticketsToShow
     .slice(0, 5)
-    .map((ticket) => `• ${ticket.id} | ${ticket.customerName} | ${ticket.status} | ${ticket.lastMessage}`)
+    .map((ticket) => {
+      const lastMsg = ticket.messages?.length > 0 ? ticket.messages[ticket.messages.length - 1].message : '-';
+      return `• ${ticket.ticketId} | ${ticket.status} | ${lastMsg}`;
+    })
     .join('\n');
+}
+
+export async function listCsTickets(telegramId: number): Promise<TicketRecord[]> {
+  const csAgent = await prisma.csAgent.findUnique({ where: { telegramId } });
+  if (!csAgent) return [];
+
+  const tickets = await prisma.ticket.findMany({
+    where: { 
+      csAgentId: csAgent.id,
+      status: { not: 'closed' } 
+    },
+    orderBy: { createdAt: 'desc' },
+    include: { messages: true }
+  });
+  return tickets as unknown as TicketRecord[];
 }

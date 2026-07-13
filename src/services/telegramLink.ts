@@ -1,35 +1,12 @@
 import { config } from '../config.js';
-import type { TelegramLaunchPayload } from './telegramPayload.js';
+import { type TelegramLaunchPayload, encryptPayload } from './telegramPayload.js';
 
 export interface TelegramDeepLinkOptions extends TelegramLaunchPayload {
   botUsername?: string;
 }
 
 export function serializeLaunchPayload(payload: TelegramLaunchPayload): string {
-  const segments: string[] = [];
-
-  if (payload.source) {
-    segments.push(payload.source);
-  }
-
-  if (payload.role) {
-    segments.push(payload.role);
-  }
-
-  if (payload.userId !== undefined) {
-    segments.push('user', String(payload.userId));
-  }
-
-  if (payload.ticketId) {
-    const compactTicketId = payload.ticketId.replace(/^TCK-/, '');
-    segments.push('ticket', compactTicketId);
-  }
-
-  if (payload.action) {
-    segments.push(payload.action);
-  }
-
-  return segments.join('-');
+  return encryptPayload(payload);
 }
 
 export function buildTelegramDeepLink(options: TelegramDeepLinkOptions): string {

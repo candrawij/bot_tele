@@ -4,6 +4,7 @@ import { bot } from '../bot/bot.js';
 import { config } from '../config.js';
 import { buildAdminDashboardLink, buildCsListLink, buildCustomerSupportLink } from '../services/telegramLink.js';
 import { getWebsiteUserByEmail, getWebsiteUserById } from '../services/websiteUserStore.js';
+import { prisma } from '../services/prisma.js';
 
 const defaultPort = Number(process.env.WEBSITE_API_PORT ?? 3001);
 const webhookHandler = config.webhookDomain
@@ -151,6 +152,94 @@ export function startWebsiteApi(port = defaultPort): http.Server {
         jsonResponse(res, 400, {
           success: false,
           message: error instanceof Error ? error.message : 'invalid request',
+        });
+      }
+
+      return;
+    }
+
+    if (req.method === 'POST' && requestUrl.pathname === '/api/notify-transaction') {
+      try {
+        const bodyText = await readBody(req);
+        const payload = bodyText ? JSON.parse(bodyText) : {};
+        const { trxId, status } = payload;
+
+        if (!trxId || !status) {
+          jsonResponse(res, 400, { success: false, message: 'trxId and status are required' });
+          return;
+        }
+
+        const trx = await prisma.transaction.findUnique({
+          where: { trxId },
+          include: {
+            game: true,
+            product: true,
+            user: true,
+          },
+        });
+
+        if (!trx) {
+          jsonResponse(res, 404, { success: false, message: 'transaction not found' });
+          return;
+        }
+
+        await prisma.transaction.update({
+          where: { trxId },
+          data: { status },
+        });
+
+        if (trx.user && trx.user.telegramId) {
+          const telegramId = Number(trx.user.telegramId);
+          let messageText = '';
+
+          if (status === 'success') {
+            messageText = [
+              '🔔 *UPDATE TRANSAKSI*',
+              '',
+              `Halo Kak ${trx.user.name || 'Pelanggan'}! 👋`,
+              `Transaksi Anda dengan ID *${trx.trxId}* telah *BERHASIL* diproses!`,
+              '',
+              `🎮 *Game*: ${trx.game.name}`,
+              `📦 *Produk*: ${trx.product.name}`,
+              `💰 *Nominal*: Rp ${Number(trx.amount).toLocaleString('id-ID')}`,
+              `🚦 *Status*: SUKSES`,
+              '',
+              'Terima kasih sudah berbelanja di TopUpGames! 🙏',
+            ].join('\n');
+          } else if (status === 'failed') {
+            messageText = [
+              '🔔 *UPDATE TRANSAKSI*',
+              '',
+              `Halo Kak ${trx.user.name || 'Pelanggan'}!`,
+              `Transaksi Anda dengan ID *${trx.trxId}* *GAGAL* diproses.`,
+              '',
+              `🎮 *Game*: ${trx.game.name}`,
+              `📦 *Produk*: ${trx.product.name}`,
+              `🚦 *Status*: GAGAL`,
+              '',
+              'Silakan hubungi Customer Service kami untuk info lebih lanjut.',
+            ].join('\n');
+          } else {
+            messageText = `🔔 *UPDATE TRANSAKSI*\n\nStatus transaksi Anda dengan ID *${trx.trxId}* berubah menjadi *${status.toUpperCase()}*.`;
+          }
+
+          await bot.api.sendMessage(telegramId, messageText, { parse_mode: 'Markdown' });
+
+          jsonResponse(res, 200, {
+            success: true,
+            message: 'notification sent to telegram user',
+            telegramId,
+          });
+        } else {
+          jsonResponse(res, 200, {
+            success: true,
+            message: 'status updated, but no telegram_id linked to user',
+          });
+        }
+      } catch (error) {
+        jsonResponse(res, 500, {
+          success: false,
+          message: error instanceof Error ? error.message : 'server error',
         });
       }
 

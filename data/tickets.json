@@ -6,8 +6,8 @@
     "status": "pending",
     "priority": "normal",
     "createdAt": "2026-07-12T20:20:44.951Z",
-    "updatedAt": "2026-07-13T01:34:20.089Z",
-    "lastMessage": "\"Harga [produk] Rp [harga] Kak. Mau order?",
+    "updatedAt": "2026-07-13T02:33:24.924Z",
+    "lastMessage": "TRX-987",
     "conversation": [
       {
         "sender": "customer",
@@ -28,6 +28,16 @@
         "sender": "cs",
         "text": "\"Harga [produk] Rp [harga] Kak. Mau order?",
         "createdAt": "2026-07-13T01:34:20.088Z"
+      },
+      {
+        "sender": "customer",
+        "text": "TRX-987",
+        "createdAt": "2026-07-13T02:31:47.358Z"
+      },
+      {
+        "sender": "customer",
+        "text": "TRX-987",
+        "createdAt": "2026-07-13T02:33:24.924Z"
       }
     ]
   },

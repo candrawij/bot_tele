@@ -13,4 +13,5 @@ export const config = {
   webhookPath: process.env.WEBHOOK_PATH ?? '/telegram-webhook',
   webhookPort: Number(process.env.WEBHOOK_PORT ?? 3002),
   webhookSecretToken: process.env.WEBHOOK_SECRET_TOKEN ?? '',
+  deepLinkSecret: process.env.DEEP_LINK_SECRET ?? '12345678901234567890123456789012',
 };

@@ -8,13 +8,15 @@ import {
   getTicketById,
   getUserSession,
   listAdminTickets,
-  listOpenTickets,
+  listOpenTickets, listCsTickets,
   setUserSession,
   ticketListText,
   ticketSummary,
   updateTicketStatus,
 } from '../services/ticketStore.js';
 import { parsePayload } from '../services/telegramPayload.js';
+import { getTransactionByTrxId } from '../services/transactionStore.js';
+import { prisma } from '../services/prisma.js';
 
 export const bot = new Bot(config.telegramBotToken);
 
@@ -99,9 +101,21 @@ const transactionStatusTemplate = (): string => [
   '📦 CEK STATUS TRANSAKSI',
   '',
   'Silakan masukkan Transaction ID Anda.',
-  'Contoh: TRX250712ABC',
+  'Contoh: TRX-987',
   '',
   'Atau kirimkan ID Game Anda, kami akan cari di sistem.',
+].join('\n');
+
+const transactionDetailsTemplate = (trx: any): string => [
+  '📦 DETAIL TRANSAKSI',
+  '',
+  `🆔 ID Transaksi: ${trx.trxId}`,
+  `🎮 Game: ${trx.game.name}`,
+  `📦 Produk: ${trx.product.name}`,
+  `👤 ID Game User: ${trx.userGameId}`,
+  `💰 Nominal: Rp ${Number(trx.amount).toLocaleString('id-ID')}`,
+  `🚦 Status: ${trx.status.toUpperCase()}`,
+  `📅 Waktu: ${new Date(trx.createdAt).toLocaleString('id-ID')}`,
 ].join('\n');
 
 const faqTemplate = (): string => [
@@ -157,7 +171,10 @@ async function forwardCustomerMessageToAdmin(userId: number, userName: string, t
   }
 
   const adminText = userToAdminTemplate(userName, userId, message, ticketId);
-  const sentMessage = await bot.api.sendMessage(config.adminGroupChatId, adminText);
+  const keyboard = new InlineKeyboard().text('✅ Selesaikan Tiket', `admin_close_ticket:${ticketId}`);
+  const sentMessage = await bot.api.sendMessage(config.adminGroupChatId, adminText, {
+    reply_markup: keyboard,
+  });
   adminReplyMap.set(sentMessage.message_id, { userId, ticketId, userName });
 }
 
@@ -183,18 +200,18 @@ bot.command('start', async (ctx) => {
     return;
   }
 
-  const ticket = getOrCreateCustomerTicket(
+  const ticket = await getOrCreateCustomerTicket(
     telegramId,
     customerName,
     'Customer membuka chat dari Telegram.',
     payload.websiteUserId,
   );
 
-  setUserSession(telegramId, 'customer', ticket.id);
+  setUserSession(telegramId, 'customer', ticket.ticketId);
 
   const welcomeMessage = config.csOffline
     ? csOfflineTemplate()
-    : customerStartTemplate(customerName, ticket.id);
+    : customerStartTemplate(customerName, ticket.ticketId);
 
   await ctx.reply(welcomeMessage, {
     reply_markup: buildMainMenu('customer'),
@@ -220,10 +237,10 @@ bot.command('menu', async (ctx) => {
     return;
   }
 
-  const ticket = getCustomerTicket(telegramId);
+  const ticket = await getCustomerTicket(telegramId);
   const welcomeMessage = config.csOffline
     ? csOfflineTemplate()
-    : customerStartTemplate(ctx.from?.first_name ?? 'Customer', ticket?.id ?? 'TCK-0000');
+    : customerStartTemplate(ctx.from?.first_name ?? 'Customer', ticket?.ticketId ?? 'TCK-0000');
 
   await ctx.reply(welcomeMessage, {
     reply_markup: buildMainMenu('customer'),
@@ -238,7 +255,7 @@ bot.command('help', async (ctx) => {
 
 bot.command('status', async (ctx) => {
   const telegramId = ctx.from?.id ?? 0;
-  const ticket = getCustomerTicket(telegramId);
+  const ticket = await getCustomerTicket(telegramId);
 
   if (!ticket) {
     await ctx.reply('Anda belum memiliki tiket aktif.');
@@ -289,61 +306,101 @@ bot.on('callback_query:data', async (ctx) => {
   }
 
   if (data === 'customer_ticket') {
-    const ticket = getCustomerTicket(telegramId);
+    const ticket = await getCustomerTicket(telegramId);
     await ctx.reply(ticket ? ticketSummary(ticket) : 'Belum ada tiket aktif untuk akun Anda.');
     await ctx.answerCallbackQuery('Menampilkan tiket Anda');
     return;
   }
 
   if (data === 'cs_open_tickets') {
-    const tickets = listOpenTickets();
+    const tickets = await listOpenTickets();
     await ctx.reply(ticketListText(tickets));
     await ctx.answerCallbackQuery('Daftar tiket terbuka ditampilkan');
     return;
   }
 
   if (data === 'cs_my_tickets') {
-    const tickets = listOpenTickets().filter((ticket) => ticket.assignedCsId === telegramId);
+    const tickets = await listCsTickets(telegramId);
     await ctx.reply(ticketListText(tickets));
     await ctx.answerCallbackQuery('Daftar tiket Anda ditampilkan');
     return;
   }
 
   if (data === 'cs_take_ticket') {
-    const ticket = listOpenTickets()[0];
+    const ticket = (await listOpenTickets())[0];
     if (!ticket) {
       await ctx.reply('Tidak ada tiket yang bisa diambil.');
       await ctx.answerCallbackQuery('Tidak ada tiket');
       return;
     }
 
-    assignTicket(ticket.id, telegramId);
-    setUserSession(telegramId, 'cs', ticket.id);
-    await ctx.reply(`Tiket ${ticket.id} berhasil diambil oleh Anda.\nSilakan balas tiket tersebut.`);
+    await assignTicket(ticket.ticketId, telegramId);
+    setUserSession(telegramId, 'cs', ticket.ticketId);
+    await ctx.reply(`Tiket ${ticket.ticketId} berhasil diambil oleh Anda.\nSilakan balas tiket tersebut.`);
     await ctx.answerCallbackQuery('Tiket berhasil diambil');
     return;
   }
 
   if (data === 'admin_all_tickets') {
-    const tickets = listAdminTickets();
+    const tickets = await listAdminTickets();
     await ctx.reply(ticketListText(tickets));
     await ctx.answerCallbackQuery('Menampilkan semua tiket');
     return;
   }
 
   if (data === 'admin_urgent') {
-    const tickets = listAdminTickets().filter((ticket) => ticket.priority === 'high');
+    const tickets = (await listAdminTickets()).filter((ticket) => ticket.priority === 'high');
     await ctx.reply(ticketListText(tickets));
     await ctx.answerCallbackQuery('Menampilkan tiket urgent');
     return;
   }
 
   if (data === 'admin_dashboard') {
-    const tickets = listAdminTickets().slice(0, 3);
+    const tickets = (await listAdminTickets()).slice(0, 3);
     await ctx.reply(
       ['Dashboard Admin', 'Tiket terbaru:', ticketListText(tickets)].join('\n'),
     );
     await ctx.answerCallbackQuery('Dashboard admin ditampilkan');
+    return;
+  }
+
+  if (data.startsWith('admin_close_ticket:')) {
+    const ticketId = data.replace('admin_close_ticket:', '');
+    const ticket = await getTicketById(ticketId);
+
+    if (!ticket) {
+      await ctx.answerCallbackQuery('Tiket tidak ditemukan.');
+      return;
+    }
+
+    if (ticket.status === 'closed') {
+      await ctx.answerCallbackQuery('Tiket ini sudah ditutup sebelumnya.');
+      return;
+    }
+
+    await updateTicketStatus(ticketId, 'closed');
+
+    if (ticket.userId) {
+      const user = await prisma.user.findUnique({ where: { id: ticket.userId } });
+      if (user && user.telegramId) {
+        const customerText = `Pesan dari CS: Tiket bantuan Anda #${ticket.ticketId} telah diselesaikan. Terima kasih telah menghubungi kami! 🙏`;
+        await bot.api.sendMessage(Number(user.telegramId), customerText);
+      }
+    }
+
+    const originalText = ctx.callbackQuery.message?.text ?? '';
+    const updatedText = `${originalText}\n\n✅ *[TIKET SELESAI]*\nDitutup oleh: ${ctx.from?.first_name || 'Admin'}`;
+    
+    try {
+      await ctx.editMessageText(updatedText, {
+        parse_mode: 'Markdown',
+        reply_markup: undefined,
+      });
+    } catch (e) {
+      console.error('Failed to edit admin message:', e);
+    }
+
+    await ctx.answerCallbackQuery('Tiket berhasil ditutup.');
     return;
   }
 
@@ -366,10 +423,10 @@ bot.on('message:text', async (ctx) => {
         await bot.api.sendMessage(forwardReference.userId, responseText);
         await ctx.reply('✅ Balasan berhasil dikirim ke user.');
 
-        const ticket = getTicketById(forwardReference.ticketId);
+        const ticket = await getTicketById(forwardReference.ticketId);
         if (ticket) {
-          appendMessage(ticket.id, 'cs', ctx.message.text ?? '');
-          updateTicketStatus(ticket.id, 'pending');
+          await appendMessage(ticket.ticketId, 'cs', ctx.message.text ?? '');
+          await updateTicketStatus(ticket.ticketId, 'pending');
         }
       }
     }
@@ -392,45 +449,55 @@ bot.on('message:text', async (ctx) => {
   }
 
   if (role === 'customer') {
-    const ticket = getOrCreateCustomerTicket(telegramId, ctx.from?.first_name ?? 'Customer', text);
-    appendMessage(ticket.id, 'customer', text);
+    if (/^trx/i.test(text)) {
+      const transaction = await getTransactionByTrxId(text);
+      if (transaction) {
+        await ctx.reply(transactionDetailsTemplate(transaction));
+      } else {
+        await ctx.reply(`🔍 Transaksi dengan ID "${text}" tidak ditemukan.\nSilakan periksa kembali ID Transaksi Anda atau hubungi CS jika Anda butuh bantuan.`);
+      }
+      return;
+    }
+
+    const ticket = await getOrCreateCustomerTicket(telegramId, ctx.from?.first_name ?? 'Customer', text);
+    await appendMessage(ticket.ticketId, 'customer', text);
 
     await forwardCustomerMessageToAdmin(
       telegramId,
       ctx.from?.first_name ?? 'Customer',
-      ticket.id,
+      ticket.ticketId,
       text,
     );
 
     await ctx.reply(
-      `📩 Pesan Anda sudah masuk ke ticket ${ticket.id}.\nTim CS akan menanggapi segera.\nKetik /status untuk mengecek progress ticket Anda.`,
+      `📩 Pesan Anda sudah masuk ke ticket ${ticket.ticketId}.\nTim CS akan menanggapi segera.\nKetik /status untuk mengecek progress ticket Anda.`,
     );
     return;
   }
 
   if (role === 'cs') {
-    const ticket = getTicketById(session?.ticketId ?? '');
+    const ticket = await getTicketById(session?.ticketId ?? '');
 
     if (!ticket) {
       await ctx.reply('Anda belum memilih tiket. Pilih tiket dari daftar terbuka terlebih dahulu.');
       return;
     }
 
-    appendMessage(ticket.id, 'cs', text);
-    updateTicketStatus(ticket.id, 'pending');
-    await ctx.reply(`Balasan Anda telah disimpan ke tiket ${ticket.id}.`);
+    await appendMessage(ticket.ticketId, 'cs', text);
+    await updateTicketStatus(ticket.ticketId, 'pending');
+    await ctx.reply(`Balasan Anda telah disimpan ke tiket ${ticket.ticketId}.`);
     return;
   }
 
   if (role === 'admin') {
-    const ticket = getTicketById(session?.ticketId ?? '');
+    const ticket = await getTicketById(session?.ticketId ?? '');
     if (!ticket) {
       await ctx.reply('Anda belum memilih tiket. Gunakan menu admin untuk melihat daftar tiket.');
       return;
     }
 
-    appendMessage(ticket.id, 'admin', text);
-    await ctx.reply(`Pesan admin masuk ke tiket ${ticket.id}.`);
+    await appendMessage(ticket.ticketId, 'admin', text);
+    await ctx.reply(`Pesan admin masuk ke tiket ${ticket.ticketId}.`);
   }
 });
 

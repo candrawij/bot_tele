@@ -1,0 +1,23 @@
+[
+  {
+    "id": 12345,
+    "name": "Rina Customer",
+    "email": "rina@contoh.com",
+    "role": "customer",
+    "activeTicketId": "TCK-0001"
+  },
+  {
+    "id": 9001,
+    "name": "CS One",
+    "email": "cs1@contoh.com",
+    "role": "cs",
+    "activeTicketId": "TCK-0002"
+  },
+  {
+    "id": 9002,
+    "name": "Admin One",
+    "email": "admin@contoh.com",
+    "role": "admin",
+    "activeTicketId": "TCK-0003"
+  }
+]
